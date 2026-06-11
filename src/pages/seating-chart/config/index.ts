@@ -1,0 +1,43 @@
+import {
+  RELATIONSHIP_TIERS,
+  formatTierLabel,
+} from "../../../components/form/config/relationship-tiers";
+import type { SelectOption } from "../../../components/form/select";
+
+/** Distinct, readable colors used to tint tables (and their nodes in the graph). */
+export const TABLE_PALETTE = [
+  "#8b7cff", // violet
+  "#4ad6a0", // mint
+  "#ff9f6e", // coral
+  "#5cc8ff", // sky
+  "#f7c948", // gold
+  "#ff7eb6", // pink
+  "#9d7bff", // purple
+  "#6ee7b7", // green
+  "#f6a5c0", // rose
+  "#7dd3fc", // cyan
+  "#fbbf72", // amber
+  "#b794f6", // lilac
+];
+
+export function tableColor(index: number): string {
+  return TABLE_PALETTE[index % TABLE_PALETTE.length];
+}
+
+/** Unassigned / default node color (slate). */
+export const UNASSIGNED_COLOR = "#5b6473";
+
+/**
+ * Relationship tiers as <Select> options. The option value is the tier's ARRAY
+ * INDEX (not its weight) so labels that share a weight — e.g. "Sibling" and
+ * "Good friend" both = 3 — remain individually selectable in the dropdown.
+ * Convert back with `tierWeightByIndex` when saving the connection.
+ */
+export const TIER_OPTIONS: SelectOption[] = RELATIONSHIP_TIERS.map((t, i) => ({
+  label: formatTierLabel(t),
+  value: i,
+}));
+
+export function tierWeightByIndex(index: number): number {
+  return RELATIONSHIP_TIERS[index]?.value ?? RELATIONSHIP_TIERS[0].value;
+}
