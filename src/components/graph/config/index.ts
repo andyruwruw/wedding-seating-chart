@@ -18,3 +18,6 @@ export const LABEL_COLOR = "rgba(232, 236, 243, 0.92)";
 
 /** Keep-apart edges render in this warning color, dashed. */
 export const CONFLICT_COLOR = "rgba(255, 93, 108, 0.9)";
+
+/** "Might get along" hints render in this soft color, dashed. */
+export const TENTATIVE_COLOR = "rgba(110, 231, 183, 0.7)";

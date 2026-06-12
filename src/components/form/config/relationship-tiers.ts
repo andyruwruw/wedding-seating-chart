@@ -12,6 +12,8 @@ export interface RelationshipTier {
   value: number;
   /** Hard constraint: this pair is one unit and must share a table. */
   keepTogether?: boolean;
+  /** A speculative "might click" hint — drawn as a dashed edge. */
+  tentative?: boolean;
 }
 
 /** Special weight: a hard "must not sit together" constraint, not a closeness. */
@@ -21,8 +23,8 @@ export const RELATIONSHIP_TIERS: RelationshipTier[] = [
   { label: "Partner / Spouse", value: 1, keepTogether: true },
   { label: "Best friend", value: 1 },
   { label: "Sibling", value: 2 },
-  { label: "Parent / Child", value: 2 },
   { label: "Close friend", value: 2 },
+  { label: "Parent / Child", value: 4 },
   { label: "Good friend", value: 3 },
   { label: "Cousin", value: 3 },
   { label: "Extended family", value: 4 },
@@ -30,6 +32,7 @@ export const RELATIONSHIP_TIERS: RelationshipTier[] = [
   { label: "Colleague", value: 5 },
   { label: "Acquaintance", value: 5 },
   { label: "Met once", value: 6 },
+  { label: "Might get along", value: 7, tentative: true },
   { label: "🚫 Must not sit together", value: KEEP_APART_VALUE },
 ];
 
@@ -43,18 +46,26 @@ export const KEEP_TOGETHER_LABELS = new Set(
   RELATIONSHIP_TIERS.filter((t) => t.keepTogether).map((t) => t.label),
 );
 
+/** Tier values drawn as speculative "might get along" hints (dashed edges). */
+export const TENTATIVE_VALUES = new Set(
+  RELATIONSHIP_TIERS.filter((t) => t.tentative).map((t) => t.value),
+);
+
 /** Default tier used when an imported label is unknown. */
 export const DEFAULT_TIER =
   RELATIONSHIP_TIERS.find((t) => t.label === "Acquaintance") ?? RELATIONSHIP_TIERS[0];
 
 /**
  * Affinity = how strongly a co-seated pair wants to be together.
- * Closer tier (value 1) → highest affinity; far tier (value MAX_TIER) → 1.
- * Keep-apart returns 0 here (the hard constraint is handled separately).
+ *
+ * Geometric taper: each step closer is `taper`× the previous one, so the
+ * weakest tier is 1 and the strongest is taper^(MAX_TIER-1). A bigger `taper`
+ * makes strong ties dominate and weak ties fade — the curve drops off faster.
+ * Keep-apart returns 0 (the hard constraint is handled separately).
  */
-export function affinityForValue(value: number): number {
+export function affinityForValue(value: number, taper: number): number {
   if (value === KEEP_APART_VALUE) return 0;
-  return MAX_TIER + 1 - value;
+  return Math.pow(taper, MAX_TIER - value);
 }
 
 /** Look up the first label matching a value (fallback for legacy data). */

@@ -21,7 +21,11 @@ export function jsonToSnapshot(text: string): ProjectSnapshot {
     if (typeof guest.id !== "string" || typeof guest.name !== "string") {
       throw new Error("Each guest needs a string `id` and `name`.");
     }
-    return { id: guest.id, name: guest.name };
+    return {
+      id: guest.id,
+      name: guest.name,
+      fomo: typeof guest.fomo === "number" ? guest.fomo : 1,
+    };
   });
 
   const guestIds = new Set(guests.map((g) => g.id));

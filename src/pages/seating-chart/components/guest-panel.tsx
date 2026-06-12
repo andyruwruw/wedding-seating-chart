@@ -3,7 +3,7 @@ import { Panel } from "../../../components/layout/panel";
 import { Button } from "../../../components/form/button";
 import { TextField } from "../../../components/form/text-field";
 import { useAppStore } from "../../../store/use-app-store";
-import { tableColor } from "../config";
+import { tableColor, fomoLevel, nextFomoMult } from "../config";
 import { ImportDialog } from "./import-dialog";
 import { ExportDialog } from "./export-dialog";
 
@@ -15,6 +15,7 @@ export function GuestPanel() {
   const addGuest = useAppStore((s) => s.addGuest);
   const removeGuest = useAppStore((s) => s.removeGuest);
   const selectGuest = useAppStore((s) => s.selectGuest);
+  const setGuestFomo = useAppStore((s) => s.setGuestFomo);
   const clearAll = useAppStore((s) => s.clearAll);
 
   const [name, setName] = useState("");
@@ -92,6 +93,16 @@ export function GuestPanel() {
                 }}
               />
               <span className="guest-name">{g.name}</span>
+              <button
+                className="fomo-chip"
+                title={`FOMO: ${fomoLevel(g.fomo).label} — click to change`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGuestFomo(g.id, nextFomoMult(g.fomo));
+                }}
+              >
+                {fomoLevel(g.fomo).emoji}
+              </button>
               <span className="guest-meta">{connectionCount(g.id)}</span>
               <Button
                 variant="danger"

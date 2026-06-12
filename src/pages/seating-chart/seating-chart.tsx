@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GuestPanel } from "./components/guest-panel";
 import { ConnectionEditor } from "./components/connection-editor";
+import { GroupConnect } from "./components/group-connect";
 import { GraphSettings } from "./components/graph-settings";
 import { GraphView } from "./components/graph-view";
 import { TablesView } from "./components/tables-view";
@@ -10,16 +11,18 @@ import { useAppStore } from "../../store/use-app-store";
 import "./seating-chart.css";
 
 type CenterView = "graph" | "tables";
-type LeftTab = "guests" | "connections" | "graph";
+type LeftTab = "guests" | "connections" | "groups" | "graph";
 
 const LEFT_TABS: { id: LeftTab; label: string }[] = [
   { id: "guests", label: "Guests" },
   { id: "connections", label: "Connections" },
+  { id: "groups", label: "Groups" },
   { id: "graph", label: "Graph" },
 ];
 
 export function SeatingChart() {
   const result = useAppStore((s) => s.result);
+  const isGenerating = useAppStore((s) => s.isGenerating);
   const selectedGuestId = useAppStore((s) => s.selectedGuestId);
   const [view, setView] = useState<CenterView>("graph");
   const [leftTab, setLeftTab] = useState<LeftTab>("guests");
@@ -53,6 +56,7 @@ export function SeatingChart() {
         <div className="left-body">
           {leftTab === "guests" && <GuestPanel />}
           {leftTab === "connections" && <ConnectionEditor />}
+          {leftTab === "groups" && <GroupConnect />}
           {leftTab === "graph" && <GraphSettings />}
         </div>
       </aside>
@@ -76,6 +80,12 @@ export function SeatingChart() {
         )}
         <div className="view-body">
           {view === "tables" && result ? <TablesView /> : <GraphView />}
+          {isGenerating && (
+            <div className="generating-overlay">
+              <div className="spinner" />
+              <span>Generating seating…</span>
+            </div>
+          )}
         </div>
       </main>
 

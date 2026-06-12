@@ -35,6 +35,10 @@ export interface GoogleSyncState {
   spreadsheetUrl: string | null;
   spreadsheetTitle: string | null;
   autoSync: boolean;
+  /** Poll the sheet and pull in external edits to the Guests/Connections tabs. */
+  livePull: boolean;
+  /** Name-based signature of the last state app and sheet agreed on. */
+  lastSig: string | null;
   status: SyncStatus;
   error: string | null;
   lastSyncedAt: number | null;
@@ -46,6 +50,8 @@ const DEFAULT_GOOGLE: GoogleSyncState = {
   spreadsheetUrl: null,
   spreadsheetTitle: null,
   autoSync: true,
+  livePull: true,
+  lastSig: null,
   status: "idle",
   error: null,
   lastSyncedAt: null,
@@ -56,6 +62,7 @@ interface AppState {
   connections: Connection[];
   config: SeatingConfig;
   result: SeatingResult | null;
+  isGenerating: boolean;
   selectedGuestId: string | null;
   graphSettings: GraphSettings;
   google: GoogleSyncState;
@@ -63,10 +70,20 @@ interface AppState {
   addGuest: (name: string) => Guest | null;
   removeGuest: (id: string) => void;
   renameGuest: (id: string, name: string) => void;
+  setGuestFomo: (id: string, fomo: number) => void;
   selectGuest: (id: string | null) => void;
 
   setConnection: (source: string, target: string, label: string) => void;
   removeConnection: (source: string, target: string) => void;
+  /**
+   * Connect every pair among `ids` with `label` (a clique). Existing pairs are
+   * left untouched unless `overwrite` is true. Returns how many were added/changed.
+   */
+  addGroupConnections: (
+    ids: string[],
+    label: string,
+    overwrite: boolean,
+  ) => number;
 
   setConfig: (patch: Partial<SeatingConfig>) => void;
   setGraphSettings: (patch: Partial<GraphSettings>) => void;
@@ -87,6 +104,10 @@ const DEFAULT_CONFIG: SeatingConfig = {
   autoTables: true,
   allowEmptySeats: true,
   effort: "balanced",
+  taper: 2,
+  fomo: 1,
+  worstCaseScore: false,
+  cohesion: 1,
 };
 
 export const DEFAULT_GRAPH_SETTINGS: GraphSettings = {
@@ -101,6 +122,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   connections: [],
   config: DEFAULT_CONFIG,
   result: null,
+  isGenerating: false,
   selectedGuestId: null,
   graphSettings: DEFAULT_GRAPH_SETTINGS,
   google: DEFAULT_GOOGLE,
@@ -112,7 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       (g) => g.name.toLowerCase() === trimmed.toLowerCase(),
     );
     if (exists) return null;
-    const guest: Guest = { id: makeId(), name: trimmed };
+    const guest: Guest = { id: makeId(), name: trimmed, fomo: 1 };
     set((s) => ({ guests: [...s.guests, guest] }));
     return guest;
   },
@@ -134,6 +156,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       guests: s.guests.map((g) => (g.id === id ? { ...g, name: trimmed } : g)),
     }));
   },
+
+  setGuestFomo: (id, fomo) =>
+    set((s) => ({
+      guests: s.guests.map((g) => (g.id === id ? { ...g, fomo } : g)),
+    })),
 
   selectGuest: (id) => set({ selectedGuestId: id }),
 
@@ -163,6 +190,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  addGroupConnections: (ids, label, overwrite) => {
+    if (ids.length < 2) return 0;
+    const value = valueForLabel(label);
+    const byPair = new Map(
+      get().connections.map((c) => [pairKey(c.source, c.target), c] as const),
+    );
+    let changed = 0;
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i];
+        const b = ids[j];
+        if (a === b) continue;
+        const key = pairKey(a, b);
+        if (byPair.has(key) && !overwrite) continue;
+        byPair.set(key, { source: a, target: b, value, label });
+        changed++;
+      }
+    }
+    if (changed > 0) {
+      set({ connections: [...byPair.values()], result: null });
+    }
+    return changed;
+  },
+
   setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
 
   setGraphSettings: (patch) =>
@@ -175,15 +226,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   resetGoogle: () => set({ google: DEFAULT_GOOGLE }),
 
   generate: () => {
-    const { guests, connections, config } = get();
-    const seed = makeSeed();
-    set({ result: solveSeating(guests, connections, config, seed) });
+    // Defer the (synchronous, possibly heavy) solve so the UI can paint the
+    // loading overlay before the main thread blocks on it.
+    set({ isGenerating: true });
+    setTimeout(() => {
+      const { guests, connections, config } = get();
+      set({
+        result: solveSeating(guests, connections, config, makeSeed()),
+        isGenerating: false,
+      });
+    }, 0);
   },
 
   regenerate: () => {
-    const { guests, connections, config } = get();
-    const seed = makeSeed();
-    set({ result: solveSeating(guests, connections, config, seed) });
+    set({ isGenerating: true });
+    setTimeout(() => {
+      const { guests, connections, config } = get();
+      set({
+        result: solveSeating(guests, connections, config, makeSeed()),
+        isGenerating: false,
+      });
+    }, 0);
   },
 
   loadSnapshot: (snapshot, merge = false) =>

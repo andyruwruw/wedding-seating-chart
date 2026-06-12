@@ -1,6 +1,6 @@
 import type { Connection, Guest, SeatingResult } from "../../../types";
 import type { CellValue } from "../../../lib/google/sheets";
-import { overallHappiness, tableHappiness } from "./happiness";
+import { computeHappiness, makeMultLookup } from "./happiness";
 
 /** Tab titles written to the attached spreadsheet (single words → no quoting). */
 export const SHEET_TABS = {
@@ -56,19 +56,38 @@ export function seatingRows(
   guests: Guest[],
   connections: Connection[],
   result: SeatingResult | null,
+  taper: number,
+  fomo: number,
+  worstCase: boolean,
 ): CellValue[][] {
   if (!result || result.tables.length === 0) {
     return [["No seating chart generated yet."]];
   }
   const nameOf = nameLookup(guests);
+  const report = computeHappiness(
+    result.tables,
+    connections,
+    taper,
+    fomo,
+    makeMultLookup(guests),
+    worstCase,
+  );
   const rows: CellValue[][] = [];
-  rows.push(["Overall happiness", overallHappiness(result.tables, connections)]);
+  rows.push(["Overall happiness", report.overall]);
   rows.push([]);
-  rows.push(["Table", "Happiness", "Status", "Seat", "Guest"]);
+  rows.push(["Table", "Table happiness", "Status", "Seat", "Guest", "Guest happiness"]);
   result.tables.forEach((t, i) => {
-    const h = tableHappiness(t.guestIds, connections);
+    const h = report.table[i];
     t.guestIds.forEach((id, seat) => {
-      rows.push([`Table ${i + 1}`, h.score, h.label, seat + 1, nameOf(id)]);
+      const gh = report.guest.get(id);
+      rows.push([
+        `Table ${i + 1}`,
+        h.score,
+        h.label,
+        seat + 1,
+        nameOf(id),
+        gh ? gh.score : "",
+      ]);
     });
   });
   return rows;

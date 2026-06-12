@@ -29,7 +29,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 18px;
+  padding: 18px 22px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -70,11 +70,11 @@
 }
 
 .modal-body {
-  padding: 18px;
+  padding: 22px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
 }
 
 @keyframes modal-fade {

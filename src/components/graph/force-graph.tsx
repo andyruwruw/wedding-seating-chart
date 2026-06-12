@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import type { NodeObject } from "react-force-graph-2d";
 import type { GraphSettings } from "../../types";
+import { KEEP_APART_VALUE } from "../form/config/relationship-tiers";
 import {
   GRAPH_BACKGROUND,
   LABEL_COLOR,
@@ -35,9 +36,10 @@ interface ForceGraphProps {
 
 type RFNode = NodeObject & GraphNode;
 
+type ForceAccessor = number | ((link: unknown) => number);
 interface ForceObj {
-  strength?: (value: number) => unknown;
-  distance?: (value: number) => unknown;
+  strength?: (value: ForceAccessor) => unknown;
+  distance?: (value: ForceAccessor) => unknown;
 }
 
 /** Minimal shape of the d3 forces we configure on the graph instance. */
@@ -72,6 +74,43 @@ function makeCenterGravity(getStrength: () => number) {
   return force;
 }
 
+/**
+ * A repulsion force between "must not sit together" pairs. Their link is drawn
+ * but exerts no attraction (link strength 0), so this pushes them apart instead
+ * of letting the graph pull them together.
+ */
+function makeKeepApartForce(
+  getPairs: () => Array<[string, string]>,
+  getStrength: () => number,
+) {
+  let byId = new Map<string, RFNode>();
+  const force = (alpha: number) => {
+    const s = getStrength();
+    if (!s) return;
+    for (const [aId, bId] of getPairs()) {
+      const a = byId.get(aId);
+      const b = byId.get(bId);
+      if (!a || !b) continue;
+      let dx = (b.x ?? 0) - (a.x ?? 0);
+      let dy = (b.y ?? 0) - (a.y ?? 0);
+      if (dx === 0 && dy === 0) dx = 0.5; // break exact overlap
+      const l2 = Math.max(1, dx * dx + dy * dy);
+      const l = Math.sqrt(l2);
+      const f = ((s / l2) * alpha) / l; // inverse-square repulsion
+      a.vx = (a.vx ?? 0) - dx * f;
+      a.vy = (a.vy ?? 0) - dy * f;
+      b.vx = (b.vx ?? 0) + dx * f;
+      b.vy = (b.vy ?? 0) + dy * f;
+    }
+  };
+  (force as unknown as { initialize: (n: RFNode[]) => void }).initialize = (
+    n,
+  ) => {
+    byId = new Map(n.map((node) => [node.id, node] as const));
+  };
+  return force;
+}
+
 export function ForceGraph({
   nodes,
   links,
@@ -89,6 +128,17 @@ export function ForceGraph({
     makeCenterGravity(() => gravityStrength.current),
   ).current;
   const gravityRegistered = useRef(false);
+
+  // Keep-apart repulsion: live list of pairs + strength, registered once.
+  const keepApartPairs = useRef<Array<[string, string]>>([]);
+  const keepApartStrength = useRef(0);
+  const keepApartForce = useRef(
+    makeKeepApartForce(
+      () => keepApartPairs.current,
+      () => keepApartStrength.current,
+    ),
+  ).current;
+  const keepApartRegistered = useRef(false);
 
   // Track container size so the canvas always fills its column.
   useEffect(() => {
@@ -136,7 +186,10 @@ export function ForceGraph({
 
     const link = fg.d3Force("link");
     link?.distance?.(settings.linkDistance);
-    link?.strength?.(settings.linkForce);
+    // "Must not sit together" links exert no pull — they repel instead (below).
+    link?.strength?.((l) =>
+      (l as GraphLink).value === KEEP_APART_VALUE ? 0 : settings.linkForce,
+    );
 
     // Real inward pull. forceCenter only translates the centroid, so we drive a
     // custom gravity force instead (registered once, strength read live).
@@ -144,6 +197,16 @@ export function ForceGraph({
     if (!gravityRegistered.current) {
       fg.d3Force("gravity", gravityForce);
       gravityRegistered.current = true;
+    }
+
+    // Push keep-apart pairs apart, scaled with the repel setting.
+    keepApartPairs.current = links
+      .filter((l) => l.value === KEEP_APART_VALUE)
+      .map((l) => [l.source, l.target] as [string, string]);
+    keepApartStrength.current = Math.max(2500, settings.repelForce * 25);
+    if (!keepApartRegistered.current) {
+      fg.d3Force("keepApart", keepApartForce);
+      keepApartRegistered.current = true;
     }
 
     fg.d3ReheatSimulation();

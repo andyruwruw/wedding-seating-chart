@@ -1,7 +1,7 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 
 .field-label {
@@ -15,7 +15,7 @@
 .input,
 .select {
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -91,7 +91,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 9px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   font-size: 13px;

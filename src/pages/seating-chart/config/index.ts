@@ -41,3 +41,22 @@ export const TIER_OPTIONS: SelectOption[] = RELATIONSHIP_TIERS.map((t, i) => ({
 export function tierWeightByIndex(index: number): number {
   return RELATIONSHIP_TIERS[index]?.value ?? RELATIONSHIP_TIERS[0].value;
 }
+
+/** Per-guest FOMO presets, cycled by a chip in the guest list. */
+export const FOMO_LEVELS = [
+  { label: "Chill", emoji: "😎", mult: 0.3 },
+  { label: "Normal", emoji: "🙂", mult: 1 },
+  { label: "Clingy", emoji: "🥺", mult: 2 },
+] as const;
+
+export function fomoLevel(mult = 1): (typeof FOMO_LEVELS)[number] {
+  return FOMO_LEVELS.reduce((best, lvl) =>
+    Math.abs(lvl.mult - mult) < Math.abs(best.mult - mult) ? lvl : best,
+  );
+}
+
+export function nextFomoMult(mult = 1): number {
+  const current = fomoLevel(mult);
+  const i = FOMO_LEVELS.indexOf(current);
+  return FOMO_LEVELS[(i + 1) % FOMO_LEVELS.length].mult;
+}

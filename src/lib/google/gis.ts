@@ -83,6 +83,11 @@ export async function ensureToken(): Promise<string> {
   return requestToken();
 }
 
+/** Return the current token only if it's valid — never prompts. For background polling. */
+export function getValidToken(): string | null {
+  return hasValidToken() ? accessToken : null;
+}
+
 /** Drop the cached token (e.g. after a 401) so the next call re-requests one. */
 export function invalidateToken(): void {
   accessToken = null;

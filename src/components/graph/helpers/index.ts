@@ -1,9 +1,9 @@
 import {
-  affinityForValue,
   KEEP_APART_VALUE,
   MAX_TIER,
+  TENTATIVE_VALUES,
 } from "../../form/config/relationship-tiers";
-import { CONFLICT_COLOR } from "../config";
+import { CONFLICT_COLOR, TENTATIVE_COLOR } from "../config";
 
 export interface LinkStyle {
   color: string;
@@ -20,8 +20,12 @@ export function linkStyle(value: number): LinkStyle {
   if (value === KEEP_APART_VALUE) {
     return { color: CONFLICT_COLOR, width: 1.6, dashed: true };
   }
-  const affinity = affinityForValue(value); // 1..MAX_TIER
-  const t = (affinity - 1) / Math.max(1, MAX_TIER - 1); // 0 (far) .. 1 (close)
+  if (TENTATIVE_VALUES.has(value)) {
+    return { color: TENTATIVE_COLOR, width: 1.4, dashed: true };
+  }
+  // Visual ramp from the tier rank (independent of the seating taper, so the
+  // graph stays legible at any weighting). 0 = far, 1 = closest.
+  const t = (MAX_TIER - value) / Math.max(1, MAX_TIER - 1);
   const width = 0.6 + t * 3.2;
   const alpha = 0.18 + t * 0.62;
   // Cool guest-network color, warming toward the accent for close ties.

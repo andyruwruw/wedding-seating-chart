@@ -2,6 +2,8 @@
 export interface Guest {
   id: string;
   name: string;
+  /** Personal FOMO multiplier on the global setting (1 = normal). */
+  fomo?: number;
 }
 
 /**
@@ -47,6 +49,26 @@ export interface SeatingConfig {
    */
   allowEmptySeats: boolean;
   effort: OptimizationEffort;
+  /**
+   * How sharply closeness is weighted: each tier is `taper`× the next one.
+   * Higher = strongly favour the closest ties; 1 = treat all ties equally.
+   */
+  taper: number;
+  /**
+   * Left-out aversion. 0 = only reward seating friends together; higher = also
+   * penalise leaving someone out of a gathering of their people.
+   */
+  fomo: number;
+  /**
+   * Score a table (and the overall) by its least-happy guest instead of the
+   * average — surfaces who's worst-off rather than letting happy guests mask them.
+   */
+  worstCaseScore: boolean;
+  /**
+   * How hard to keep friend-groups together. Rewards each guest for the share of
+   * their friends at their table, so cliques resist being split. 0 = off.
+   */
+  cohesion: number;
 }
 
 /** One table in a generated seating chart. */

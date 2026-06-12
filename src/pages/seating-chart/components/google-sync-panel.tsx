@@ -5,6 +5,7 @@ import { TextField } from "../../../components/form/text-field";
 import { useAppStore } from "../../../store/use-app-store";
 import {
   ensureToken,
+  getValidToken,
   invalidateToken,
   isConfigured,
   requestToken,
@@ -15,6 +16,8 @@ import {
   ensureSheets,
   extractSpreadsheetId,
   getSpreadsheet,
+  isSpreadsheetEmpty,
+  readTab,
   TokenExpiredError,
   writeTab,
 } from "../../../lib/google/sheets";
@@ -25,9 +28,11 @@ import {
   SHEET_TAB_LIST,
   SHEET_TABS,
 } from "../helpers/sheet-export";
+import { snapshotFromTabs, snapshotSignature } from "../helpers/sheet-import";
 
 const NEW_SHEET_TITLE = "Wedding Seating Chart";
 const SYNC_DEBOUNCE_MS = 1500;
+const POLL_MS = 7000;
 
 export function GoogleSyncPanel() {
   const guests = useAppStore((s) => s.guests);
@@ -36,6 +41,7 @@ export function GoogleSyncPanel() {
   const google = useAppStore((s) => s.google);
   const setGoogle = useAppStore((s) => s.setGoogle);
   const resetGoogle = useAppStore((s) => s.resetGoogle);
+  const loadSnapshot = useAppStore((s) => s.loadSnapshot);
 
   const [urlInput, setUrlInput] = useState("");
   const syncing = useRef(false);
@@ -43,7 +49,8 @@ export function GoogleSyncPanel() {
 
   const configured = isConfigured();
 
-  // Write all three tabs. Refreshes the token once on a 401.
+  // Push app → sheet, but pull external Guests/Connections edits first rather
+  // than clobber them. Refreshes the token once on a 401.
   const pushAll = useCallback(async () => {
     const id = useAppStore.getState().google.spreadsheetId;
     if (!id) return;
@@ -54,12 +61,46 @@ export function GoogleSyncPanel() {
     syncing.current = true;
     setGoogle({ status: "syncing", error: null });
 
-    const { guests: gs, connections: cs, result: rs } = useAppStore.getState();
     const doWrites = async (token: string) => {
+      const { guests: gs, connections: cs, result: rs, config } =
+        useAppStore.getState();
+      const lastSig = useAppStore.getState().google.lastSig;
+      const appSig = snapshotSignature(gs, cs);
+
+      // If the sheet's editable data changed under us, adopt it instead.
+      const gRows = await readTab(token, id, SHEET_TABS.guests).catch(() => []);
+      const cRows = await readTab(token, id, SHEET_TABS.connections).catch(() => []);
+      const sheetSnap = snapshotFromTabs(gRows, cRows);
+      if (sheetSnap.guests.length > 0) {
+        const sheetSig = snapshotSignature(sheetSnap.guests, sheetSnap.connections);
+        if (sheetSig !== lastSig && sheetSig !== appSig) {
+          loadSnapshot(sheetSnap, false);
+          setGoogle({
+            lastSig: sheetSig,
+            status: "synced",
+            lastSyncedAt: Date.now(),
+          });
+          return;
+        }
+      }
+
       await ensureSheets(token, id, SHEET_TAB_LIST);
-      await writeTab(token, id, SHEET_TABS.seating, seatingRows(gs, cs, rs));
-      await writeTab(token, id, SHEET_TABS.guests, guestRows(gs, cs, rs));
-      await writeTab(token, id, SHEET_TABS.connections, connectionRows(gs, cs));
+      await writeTab(
+        token,
+        id,
+        SHEET_TABS.seating,
+        seatingRows(gs, cs, rs, config.taper, config.fomo, config.worstCaseScore),
+      );
+      if (appSig !== lastSig) {
+        await writeTab(token, id, SHEET_TABS.guests, guestRows(gs, cs, rs));
+        await writeTab(token, id, SHEET_TABS.connections, connectionRows(gs, cs));
+      }
+      setGoogle({
+        status: "synced",
+        lastSyncedAt: Date.now(),
+        lastSig: appSig,
+        error: null,
+      });
     };
 
     try {
@@ -75,7 +116,6 @@ export function GoogleSyncPanel() {
           throw err;
         }
       }
-      setGoogle({ status: "synced", lastSyncedAt: Date.now(), error: null });
     } catch (err) {
       setGoogle({ status: "error", error: (err as Error).message });
     } finally {
@@ -85,14 +125,43 @@ export function GoogleSyncPanel() {
         pushAll();
       }
     }
-  }, [setGoogle]);
+  }, [setGoogle, loadSnapshot]);
 
-  // Debounced live sync whenever the data changes.
+  // Poll the sheet and pull in external edits (silent — never prompts).
+  const pullFromSheet = useCallback(async () => {
+    const { spreadsheetId: id, lastSig } = useAppStore.getState().google;
+    if (!id || syncing.current) return;
+    const token = getValidToken();
+    if (!token) return;
+    try {
+      const gRows = await readTab(token, id, SHEET_TABS.guests);
+      const cRows = await readTab(token, id, SHEET_TABS.connections);
+      const snap = snapshotFromTabs(gRows, cRows);
+      if (snap.guests.length === 0) return;
+      const sheetSig = snapshotSignature(snap.guests, snap.connections);
+      if (sheetSig !== lastSig) {
+        loadSnapshot(snap, false);
+        setGoogle({ lastSig: sheetSig, status: "synced", lastSyncedAt: Date.now() });
+      }
+    } catch {
+      /* transient poll error — try again next tick */
+    }
+  }, [setGoogle, loadSnapshot]);
+
+  // Debounced live push whenever app data changes.
   useEffect(() => {
     if (!google.autoSync || !google.spreadsheetId) return;
     const timer = setTimeout(pushAll, SYNC_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [guests, connections, result, google.autoSync, google.spreadsheetId, pushAll]);
+
+  // Poll for external sheet edits.
+  useEffect(() => {
+    if (!google.livePull || !google.spreadsheetId) return;
+    pullFromSheet();
+    const timer = setInterval(pullFromSheet, POLL_MS);
+    return () => clearInterval(timer);
+  }, [google.livePull, google.spreadsheetId, pullFromSheet]);
 
   const connect = async () => {
     try {
@@ -130,14 +199,56 @@ export function GoogleSyncPanel() {
     try {
       setGoogle({ status: "syncing", error: null });
       const token = await ensureToken();
-      await ensureSheets(token, id, SHEET_TAB_LIST);
       const meta = await getSpreadsheet(token, id);
+      const titles = (meta.sheets ?? []).map((s) => s.properties.title);
+      const title = meta.properties?.title ?? "Spreadsheet";
+      const url =
+        meta.spreadsheetUrl ?? `https://docs.google.com/spreadsheets/d/${id}`;
+
+      // 1) Looks like one of our sheets → import it instead of overwriting.
+      if (
+        titles.includes(SHEET_TABS.guests) &&
+        titles.includes(SHEET_TABS.connections)
+      ) {
+        const gRows = await readTab(token, id, SHEET_TABS.guests);
+        const cRows = await readTab(token, id, SHEET_TABS.connections);
+        // Trust it only if the headers match what we write.
+        const ours =
+          (gRows[0]?.[0] ?? "").trim().toLowerCase() === "name" ||
+          (cRows[0]?.[0] ?? "").trim().toLowerCase() === "source";
+        if (ours) {
+          const snapshot = snapshotFromTabs(gRows, cRows);
+          if (snapshot.guests.length > 0) {
+            loadSnapshot(snapshot, false);
+            setGoogle({
+              signedIn: true,
+              spreadsheetId: id,
+              spreadsheetUrl: url,
+              spreadsheetTitle: title,
+              status: "synced",
+              lastSyncedAt: Date.now(),
+              lastSig: snapshotSignature(snapshot.guests, snapshot.connections),
+              error: null,
+            });
+            setUrlInput("");
+            return;
+          }
+        }
+      }
+
+      // 2) Not importable → only attach if the sheet is genuinely empty.
+      const empty = await isSpreadsheetEmpty(token, id, titles);
+      if (!empty) {
+        throw new Error(
+          `“${title}” already has data I can’t read as a seating chart, so I won’t overwrite it. Attach an empty sheet, or clear/export this one first.`,
+        );
+      }
+
       setGoogle({
         signedIn: true,
         spreadsheetId: id,
-        spreadsheetUrl:
-          meta.spreadsheetUrl ?? `https://docs.google.com/spreadsheets/d/${id}`,
-        spreadsheetTitle: meta.properties?.title ?? "Spreadsheet",
+        spreadsheetUrl: url,
+        spreadsheetTitle: title,
       });
       setUrlInput("");
       pushAll();
@@ -154,6 +265,7 @@ export function GoogleSyncPanel() {
       status: "idle",
       error: null,
       lastSyncedAt: null,
+      lastSig: null,
     });
 
   const disconnect = () => {
@@ -231,6 +343,10 @@ export function GoogleSyncPanel() {
               Attach
             </Button>
           </div>
+          <p className="empty-hint">
+            A sheet already holding a seating chart is imported. A sheet with
+            other data is left untouched — it won’t be overwritten.
+          </p>
         </>
       )}
 
@@ -254,7 +370,15 @@ export function GoogleSyncPanel() {
               checked={google.autoSync}
               onChange={(e) => setGoogle({ autoSync: e.target.checked })}
             />
-            <span>Live sync on every change</span>
+            <span>Push my changes to the sheet</span>
+          </label>
+          <label className="sync-toggle">
+            <input
+              type="checkbox"
+              checked={google.livePull}
+              onChange={(e) => setGoogle({ livePull: e.target.checked })}
+            />
+            <span>Pull edits made in the sheet</span>
           </label>
 
           <div className="generate-row">

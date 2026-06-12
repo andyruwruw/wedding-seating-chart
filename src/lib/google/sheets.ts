@@ -99,6 +99,36 @@ export async function ensureSheets(
   return meta;
 }
 
+/** Read a tab's values (empty array if the tab has no data). */
+export async function readTab(
+  token: string,
+  id: string,
+  title: string,
+  range = "A1:E10000",
+): Promise<string[][]> {
+  const r = encodeURIComponent(`'${title}'!${range}`);
+  const data = await api<{ values?: string[][] }>(
+    token,
+    `${BASE}/${id}/values/${r}`,
+  );
+  return data.values ?? [];
+}
+
+/** True only if every given tab has no non-empty cells (bounded scan). */
+export async function isSpreadsheetEmpty(
+  token: string,
+  id: string,
+  titles: string[],
+): Promise<boolean> {
+  for (const title of titles) {
+    const rows = await readTab(token, id, title, "A1:Z200");
+    if (rows.some((row) => row.some((cell) => String(cell ?? "").trim() !== ""))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Overwrite a tab: clear its current contents, then write `rows` from A1. */
 export async function writeTab(
   token: string,

@@ -76,6 +76,9 @@ export function GraphView() {
             <i className="legend-line legend-far" /> Distant
           </span>
           <span className="legend-item">
+            <i className="legend-line legend-maybe" /> Maybe
+          </span>
+          <span className="legend-item">
             <i className="legend-line legend-apart" /> Keep apart
           </span>
         </div>
