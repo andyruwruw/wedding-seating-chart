@@ -1,8 +1,25 @@
 {
   "name": "wedding-seating-chart",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "A dark-mode web app that maps guest relationships on a force graph and generates a happiness-aware seating chart, with optional live Google Sheets sync.",
+  "license": "MIT",
+  "author": "Andrew Young",
+  "homepage": "https://github.com/andyruwruw/wedding-seating-chart#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andyruwruw/wedding-seating-chart.git"
+  },
+  "keywords": [
+    "wedding",
+    "seating-chart",
+    "seating-plan",
+    "react",
+    "vite",
+    "force-graph",
+    "google-sheets"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

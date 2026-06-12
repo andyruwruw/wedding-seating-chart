@@ -18,5 +18,13 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Experimental React Compiler lint rules — they flag valid patterns here
+      // (lazy useRef init for stable d3 force instances, deliberate effect-driven
+      // UI sync). Keep rules-of-hooks + exhaustive-deps; opt out of these.
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+    },
   },
 ])

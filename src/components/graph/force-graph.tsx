@@ -92,7 +92,7 @@ function makeKeepApartForce(
       const b = byId.get(bId);
       if (!a || !b) continue;
       let dx = (b.x ?? 0) - (a.x ?? 0);
-      let dy = (b.y ?? 0) - (a.y ?? 0);
+      const dy = (b.y ?? 0) - (a.y ?? 0);
       if (dx === 0 && dy === 0) dx = 0.5; // break exact overlap
       const l2 = Math.max(1, dx * dx + dy * dy);
       const l = Math.sqrt(l2);
@@ -212,7 +212,7 @@ export function ForceGraph({
     fg.d3ReheatSimulation();
     // `size.width` is included so this re-runs once the canvas actually mounts
     // (the graph ref is only available after a non-zero size is measured).
-  }, [settings, graphData, gravityForce, size.width]);
+  }, [settings, graphData, links, gravityForce, keepApartForce, size.width]);
 
   return (
     <div ref={containerRef} style={{ width: "100%", height: "100%" }}>

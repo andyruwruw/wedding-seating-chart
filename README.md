@@ -1,65 +1,159 @@
-# Wedding Seating Chart
+# 💒 Wedding Seating Chart
 
-A dark-mode, Obsidian-style graph app for planning wedding seating. Enter your
-invite list, draw weighted "closeness" connections between guests, and generate a
-best-effort seating chart that keeps close people together and "must not sit
-together" pairs apart.
+A dark-mode web app for planning wedding (or any event) seating. Map out who
+knows whom on an Obsidian-style relationship graph, then let a happiness-aware
+solver lay out the tables — keeping couples together, splitting people who
+shouldn't share a table, and doing its best so nobody feels left out.
 
-## Run
+No backend, no database. Everything runs in your browser; optionally sync the
+whole plan live to a Google Sheet.
+
+```
+Guests ──▶ Connections ──▶ Force graph ──▶ Generate ──▶ Round-table chart
+                                                     └──▶ Google Sheets (optional)
+```
+
+## ✨ Features
+
+- **Relationship graph** — an Obsidian-like force-directed view of your guests.
+  Closer ties are thicker/brighter; "must not sit together" pairs visibly repel.
+- **Named closeness tiers** — pick human labels (Best friend, Sibling, Close
+  friend, … Acquaintance) that map to numeric weights. Includes a **🚫 Must not
+  sit together** hard constraint and a soft **Might get along** hint.
+- **Couples stay together** — anyone marked *Partner / Spouse* is treated as an
+  inseparable unit and never split across tables.
+- **Best-effort seating solver** that optimises a **felt-happiness** model: each
+  guest cares about *who's at their table* and *how left out they feel* from the
+  biggest gathering of their friends happening elsewhere.
+- **Tunable to taste** with live sliders & toggles — see [Tuning](#-tuning-the-solver).
+- **Round-table view** — each table drawn as a circle with guests seated around
+  it, relationship "chords" across the table, and **every guest tinted by their
+  personal happiness** (green → red).
+- **Bulk group connect** — select a group of people and link them all at once.
+- **Friends-of-friends suggestions** when adding connections.
+- **CSV / JSON import & export**, plus **live two-way Google Sheets sync**.
+- **Dark, polished UI** — keyboard-friendly, responsive panels.
+
+## 🚀 Quick start
 
 ```bash
 npm install
-npm run dev      # start the dev server
-npm run build    # type-check + production build
+npm run dev        # http://localhost:5173
 ```
 
-## How it works
+```bash
+npm run build      # type-check + production build to dist/
+npm run preview    # serve the production build locally
+```
 
-- **Guests** — add invitees in the left panel; select one to edit their connections.
-- **Connections** — link two guests and pick a closeness tier. Tiers are named
-  (e.g. *Best friend*, *Sibling*, *Acquaintance*) but map to numeric weights —
-  **lower = closer**. Several labels can share a weight. There's a special
-  **🚫 Must not sit together** tier that the solver treats as a hard constraint.
-- **Graph** — a force-directed view of the relationships. Closer ties render
-  thicker and brighter; keep-apart ties are dashed red. Drag nodes to pin them.
-- **Seating** — choose *seats per table* or *number of tables*, then **Generate**.
-  The solver greedily clusters by affinity, then hill-climbs pairwise swaps to
-  improve the result. **↻** re-rolls a different arrangement. Generated tables
-  tint their guests' nodes in the graph.
+Requires Node 18+.
 
-## Import / Export
+## 🧠 How the seating solver works
 
-- **JSON** — full project snapshot (`guests` + `connections`).
-- **CSV** — edge list `Source,Target,Relationship` using guest names and tier
-  labels. Importing auto-creates guests; standalone guests appear as `Name,,`.
+Most seating tools grade a table by *what could be* (an idealised best case).
+This one grades by **what is**, from each guest's point of view:
 
-## Live sync to Google Sheets (optional)
+- **Who's with me** — the weight of my friends seated at my own table.
+- **How left out I feel** — the single biggest cluster of my friends gathered
+  together at *another* table (the party I'm missing). Using the *biggest* cluster
+  means "everyone-but-me together" hurts most, while a group merely *split in two*
+  hurts far less.
 
-The right-hand **Google Sheets** panel can mirror your plan to a spreadsheet,
-updating live as you edit. It's a no-backend, in-browser OAuth flow — your data
-goes straight from the browser to your own Google account.
+Those combine into a per-guest happiness score. The optimiser then **minimises
+everyone's shortfall convexly**, so a few badly-left-out guests cost more than
+many slightly-imperfect ones — it won't sacrifice one person to mildly please
+several. Hard "must not sit together" pairs are a heavy penalty; couples move as
+a unit. It runs an affinity-greedy seed followed by hill-climbing relocations and
+swaps, all deterministic from a seed so **Regenerate** explores fresh layouts.
 
-1. Create a Google OAuth Client ID (see `.env.example` for the step-by-step).
-2. Copy `.env.example` to `.env.local`, paste in your `VITE_GOOGLE_CLIENT_ID`,
-   and restart the dev server.
-3. In the app: **Connect Google** → **Create new spreadsheet** (or paste an
-   existing Sheet URL/ID to attach it).
+### 🎚 Tuning the solver
 
-It writes three tabs — **Seating** (tables, seats, happiness), **Guests**, and
-**Connections** — and re-syncs ~1.5s after any change while *Live sync* is on.
-Without a Client ID, the panel just shows setup instructions; everything else in
-the app works unchanged.
+| Control | What it does |
+|---|---|
+| **Seats per table / Number of tables** | Table capacity. Toggle **Auto-fit tables** to size the count to your guests. |
+| **Allow empty seats** | Fill tables to capacity (partial last table) vs. spread guests evenly. |
+| **Closeness weighting** | How sharply closer ties out-weigh weaker ones (geometric taper). |
+| **FOMO (left-out aversion)** | How hard the solver fights to keep nobody left out. |
+| **Group cohesion** | How strongly friend-groups are kept intact at one table. |
+| **Per-guest FOMO** (😎 / 🙂 / 🥺) | Mark individuals chill or clingy — clingy guests are protected first, chill guests yield. |
+| **Optimization effort** | Quick / Balanced / Thorough (more search = better layout). |
+| **Score by least-happy guest** | Show each table's score as its unhappiest member instead of the average. |
 
-## Structure
+## 🏷 Relationship tiers
+
+Tiers live in one place — `src/components/form/config/relationship-tiers.ts`.
+Everything else (dropdowns, graph styling, solver weights) derives from that list,
+so you can rename, re-weight, or add tiers by editing that file. Lower weight =
+closer. Several labels may share a weight (e.g. *Sibling* and *Close friend* are
+both 2); the exact label you pick is preserved through export.
+
+## 📦 Import / Export
+
+- **JSON** — a complete project snapshot (guests + connections), round-trips
+  perfectly including per-guest FOMO.
+- **CSV** — an edge list `Source,Target,Relationship` using guest names and tier
+  labels; importing auto-creates guests, and a name with blank Target/Relationship
+  is a guest with no connections yet.
+- You can also import **just a list of names** (one per line) to bootstrap quickly.
+
+## 🔗 Live Google Sheets sync (optional)
+
+The right-hand panel can mirror your plan to a Google Sheet and keep it in sync
+**both directions** — push your edits up, and pull edits made in the sheet back
+into the app (polled). It's a no-backend, in-browser OAuth flow: data goes
+straight from your browser to your own Google account.
+
+1. Create a Google OAuth **Client ID** — step-by-step is in [`.env.example`](.env.example).
+2. Copy `.env.example` to `.env.local`, paste your `VITE_GOOGLE_CLIENT_ID`, and
+   restart the dev server.
+3. In the app: **Connect Google → Create new spreadsheet** (or paste an existing
+   Sheet URL to attach it — existing seating data is imported, not overwritten).
+
+It writes three tabs — **Seating**, **Guests**, **Connections**. Without a Client
+ID the panel simply shows setup instructions and everything else works unchanged.
+
+## ☁️ Deploy (Vercel)
+
+This is a static Vite SPA — any static host works. For Vercel:
+
+1. Import the repo (it auto-detects Vite; config is in [`vercel.json`](vercel.json)).
+2. Add an environment variable **`VITE_GOOGLE_CLIENT_ID`** (it's baked in at build
+   time, so set it before deploying or redeploy after).
+3. Add your production URL to the OAuth client's **Authorized JavaScript origins**.
+
+> Note: `VITE_*` vars are embedded in the client bundle at build time — an OAuth
+> Client ID is not a secret, but never put anything truly secret in a `VITE_` var.
+
+## 🛠 Tech stack
+
+- [Vite](https://vite.dev) + [React](https://react.dev) + TypeScript
+- [Zustand](https://github.com/pmndrs/zustand) for state
+- [react-force-graph-2d](https://github.com/vasturiano/react-force-graph) for the graph
+- Google Sheets v4 REST API + Google Identity Services (no backend)
+- Plain CSS, dark theme
+
+## 📁 Project structure
 
 ```
 src/
-├── components/    # reusable: form/, graph/, layout/
-├── pages/seating-chart/   # the page, its components, config, helpers (solver, csv, json)
-├── store/         # zustand global state
+├── components/            # reusable UI: form/, graph/, layout/
+├── pages/seating-chart/   # the app — components, config, helpers (solver, happiness, csv, sheets)
+├── lib/google/            # Google auth + Sheets REST
+├── store/                 # zustand global state
 └── types/
 ```
 
-Edit the relationship tiers in
-`src/components/form/config/relationship-tiers.ts` — everything else (dropdowns,
-graph styling, solver weights) derives from that list.
+The interesting logic:
+
+- `pages/seating-chart/helpers/seating.ts` — the seating optimiser
+- `pages/seating-chart/helpers/happiness.ts` — the felt-happiness model
+- `components/graph/force-graph.tsx` — graph rendering + custom forces
+
+## 🤝 Contributing
+
+Issues and PRs welcome. `npm run build` must pass (type-check + build) and
+`npm run lint` should be clean.
+
+## 📄 License
+
+[MIT](LICENSE) © Andrew Young
