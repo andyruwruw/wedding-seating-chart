@@ -304,8 +304,17 @@
 
 .io-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
+}
+
+.guest-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guest-empty .empty-hint {
+  margin: 0;
 }
 
 /* ---------- Connections ---------- */
@@ -1009,6 +1018,17 @@
   padding: 8px 10px;
   margin: 0;
   word-break: break-word;
+}
+
+.share-banner {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--accent-soft);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 0;
 }
 
 .inline-code {

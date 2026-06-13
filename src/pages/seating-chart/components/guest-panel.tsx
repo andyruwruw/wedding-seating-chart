@@ -6,6 +6,7 @@ import { useAppStore } from "../../../store/use-app-store";
 import { tableColor, fomoLevel, nextFomoMult } from "../config";
 import { ImportDialog } from "./import-dialog";
 import { ExportDialog } from "./export-dialog";
+import { makeSampleSnapshot } from "../helpers/sample-data";
 
 export function GuestPanel() {
   const guests = useAppStore((s) => s.guests);
@@ -17,6 +18,17 @@ export function GuestPanel() {
   const selectGuest = useAppStore((s) => s.selectGuest);
   const setGuestFomo = useAppStore((s) => s.setGuestFomo);
   const clearAll = useAppStore((s) => s.clearAll);
+  const loadSnapshot = useAppStore((s) => s.loadSnapshot);
+
+  const loadSample = () => {
+    if (
+      guests.length > 0 &&
+      !confirm("Replace the current guests and connections with sample data?")
+    ) {
+      return;
+    }
+    loadSnapshot(makeSampleSnapshot(), false);
+  };
 
   const [name, setName] = useState("");
   const [dialog, setDialog] = useState<"import" | "export" | null>(null);
@@ -72,9 +84,15 @@ export function GuestPanel() {
 
       <div className="guest-list">
         {guests.length === 0 && (
-          <p className="empty-hint">
-            Add your invitees, then select a guest to link them to others.
-          </p>
+          <div className="guest-empty">
+            <p className="empty-hint">
+              Add your invitees, then select a guest to link them to others.
+            </p>
+            <p className="empty-hint">Or start from a ready-made example:</p>
+            <Button variant="primary" block onClick={loadSample}>
+              ✨ Load sample data
+            </Button>
+          </div>
         )}
         {guests.map((g) => {
           const tableIdx = tableOfGuest.get(g.id);
@@ -130,6 +148,9 @@ export function GuestPanel() {
           disabled={guests.length === 0}
         >
           ⬇ Export
+        </Button>
+        <Button small onClick={loadSample}>
+          ✨ Sample
         </Button>
       </div>
 

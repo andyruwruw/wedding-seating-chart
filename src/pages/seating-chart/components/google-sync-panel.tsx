@@ -29,6 +29,11 @@ import {
   SHEET_TABS,
 } from "../helpers/sheet-export";
 import { snapshotFromTabs, snapshotSignature } from "../helpers/sheet-import";
+import {
+  getSheetParam,
+  setSheetParam,
+  shareLinkFor,
+} from "../../../lib/share-link";
 
 const NEW_SHEET_TITLE = "Wedding Seating Chart";
 const SYNC_DEBOUNCE_MS = 1500;
@@ -44,6 +49,10 @@ export function GoogleSyncPanel() {
   const loadSnapshot = useAppStore((s) => s.loadSnapshot);
 
   const [urlInput, setUrlInput] = useState("");
+  // A sheet ID handed to us via `?sheet=<id>` — auto-attached after sign-in.
+  const [pendingSheetId] = useState(() => getSheetParam());
+  const [copied, setCopied] = useState(false);
+  const autoAttached = useRef(false);
   const syncing = useRef(false);
   const queued = useRef(false);
 
@@ -190,8 +199,9 @@ export function GoogleSyncPanel() {
     }
   };
 
-  const attachExisting = async () => {
-    const id = extractSpreadsheetId(urlInput);
+  const attachExisting = useCallback(
+    async (source?: string) => {
+    const id = extractSpreadsheetId(source ?? urlInput);
     if (!id) {
       setGoogle({ error: "Couldn't read a Sheet ID from that link." });
       return;
@@ -255,6 +265,36 @@ export function GoogleSyncPanel() {
     } catch (err) {
       setGoogle({ status: "error", error: (err as Error).message });
     }
+    },
+    [urlInput, setGoogle, loadSnapshot, pushAll],
+  );
+
+  // A shared `?sheet=<id>` link: once signed in, attach to it automatically.
+  useEffect(() => {
+    if (!pendingSheetId) return;
+    const { signedIn, spreadsheetId } = google;
+    if (!signedIn || spreadsheetId || autoAttached.current) return;
+    autoAttached.current = true;
+    setUrlInput(pendingSheetId); // fallback if the auto-attach fails
+    attachExisting(pendingSheetId);
+  }, [pendingSheetId, google, attachExisting]);
+
+  // Mirror the attached sheet into the URL so the link is shareable, and clear
+  // it when nothing is attached.
+  useEffect(() => {
+    setSheetParam(google.spreadsheetId);
+  }, [google.spreadsheetId]);
+
+  const copyShareLink = async () => {
+    const id = useAppStore.getState().google.spreadsheetId;
+    if (!id) return;
+    try {
+      await navigator.clipboard.writeText(shareLinkFor(id));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the URL bar still holds the link */
+    }
   };
 
   const detach = () =>
@@ -315,12 +355,19 @@ export function GoogleSyncPanel() {
     >
       {!google.signedIn && (
         <>
+          {pendingSheetId && (
+            <p className="share-banner">
+              A shared seating chart is ready. Connect Google to load it — make
+              sure the sheet has been shared with your account.
+            </p>
+          )}
           <Button variant="primary" block onClick={connect}>
             Connect Google
           </Button>
           <p className="empty-hint">
-            Sign in to create or attach a spreadsheet. Results, guests, and
-            connections sync live to its tabs.
+            {pendingSheetId
+              ? "After you sign in, the shared sheet loads automatically."
+              : "Sign in to create or attach a spreadsheet. Results, guests, and connections sync live to its tabs."}
           </p>
         </>
       )}
@@ -339,7 +386,7 @@ export function GoogleSyncPanel() {
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
             />
-            <Button onClick={attachExisting} disabled={!urlInput.trim()}>
+            <Button onClick={() => attachExisting()} disabled={!urlInput.trim()}>
               Attach
             </Button>
           </div>
@@ -363,6 +410,14 @@ export function GoogleSyncPanel() {
             </span>
             <span className="sheet-link-open">Open ↗</span>
           </a>
+
+          <Button small variant="ghost" block onClick={copyShareLink}>
+            {copied ? "Link copied ✓" : "Copy share link"}
+          </Button>
+          <p className="empty-hint">
+            Anyone you share the sheet with can open this link and sign in to see
+            it live.
+          </p>
 
           <label className="sync-toggle">
             <input
