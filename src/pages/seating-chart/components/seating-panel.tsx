@@ -6,14 +6,18 @@ import { Checkbox } from "../../../components/form/checkbox";
 import { Select } from "../../../components/form/select";
 import { Slider } from "../../../components/form/slider";
 import { useAppStore } from "../../../store/use-app-store";
-import type { OptimizationEffort } from "../../../types";
+import type { DndAlignment, OptimizationEffort } from "../../../types";
 import { tableColor } from "../config";
 import { computeCapacities } from "../helpers/seating";
 import {
   computeHappiness,
+  computeGuestDetails,
   HAPPINESS_COLORS,
   makeMultLookup,
+  type GuestDetail,
 } from "../helpers/happiness";
+import { tableAlignmentSummary } from "../helpers/alignment";
+import { pairKey } from "../../../store/use-app-store";
 import { TableCard } from "./table-card";
 
 const EFFORT_OPTIONS = [
@@ -35,6 +39,31 @@ export function SeatingPanel() {
   const nameOf = (id: string) => guests.find((g) => g.id === id)?.name ?? "?";
   const canGenerate = guests.length > 0;
 
+  const alignmentOf = useMemo(
+    () =>
+      new Map(
+        guests
+          .filter((g) => g.alignment)
+          .map((g) => [g.id, g.alignment as DndAlignment]),
+      ),
+    [guests],
+  );
+
+  const connectedPairsSet = useMemo(
+    () => new Set(connections.map((c) => pairKey(c.source, c.target))),
+    [connections],
+  );
+
+  const alignmentSummaries = useMemo(
+    () =>
+      result && alignmentOf.size > 0
+        ? result.tables.map((t) =>
+            tableAlignmentSummary(t.guestIds, alignmentOf, connectedPairsSet),
+          )
+        : null,
+    [result, alignmentOf, connectedPairsSet],
+  );
+
   const report = useMemo(
     () =>
       result
@@ -49,6 +78,11 @@ export function SeatingPanel() {
         : null,
     [result, connections, config.taper, config.fomo, config.worstCaseScore, guests],
   );
+  const guestDetails = useMemo(
+    () => result && report ? computeGuestDetails(result.tables, connections, report, guests) : null,
+    [result, report, connections, guests],
+  );
+
   const overall = report?.overall ?? 0;
   const overallTone =
     overall >= 85 ? "great" : overall >= 65 ? "good" : overall >= 45 ? "ok" : "bad";
@@ -145,6 +179,34 @@ export function SeatingPanel() {
         display={(v) => v.toFixed(1)}
       />
 
+      <Slider
+        label="D&D alignment influence"
+        value={config.alignmentWeight}
+        min={0}
+        max={2}
+        step={0.1}
+        onChange={(v) => setConfig({ alignmentWeight: v })}
+        display={(v) => (v === 0 ? "Off" : v.toFixed(1))}
+      />
+
+      <div
+        className={`worst-toggle${config.worstBehavior ? " worst-toggle-on" : ""}`}
+        onClick={() => setConfig({ worstBehavior: !config.worstBehavior })}
+        role="checkbox"
+        aria-checked={config.worstBehavior}
+        tabIndex={0}
+        onKeyDown={(e) => e.key === " " && setConfig({ worstBehavior: !config.worstBehavior })}
+      >
+        <span className="worst-toggle-icon">{config.worstBehavior ? "💀" : "☠️"}</span>
+        <span className="worst-toggle-text">
+          <strong>Worst possible seating</strong>
+          <span className="worst-toggle-hint">
+            Inverts the algorithm — splits friends, unites enemies.
+          </span>
+        </span>
+        <span className="worst-toggle-check">{config.worstBehavior ? "ON" : "off"}</span>
+      </div>
+
       {plan && (
         <p className="plan-readout">
           {plan.tables} table{plan.tables === 1 ? "" : "s"} ×{" "}
@@ -219,8 +281,11 @@ export function SeatingPanel() {
               key={t.id}
               index={i}
               color={tableColor(i)}
-              guestNames={t.guestIds.map(nameOf)}
+              guests={t.guestIds.map((id) => ({ id, name: nameOf(id) }))}
               happiness={report.table[i]}
+              guestDetails={guestDetails}
+              alignmentSummary={alignmentSummaries?.[i] ?? null}
+              showHarmony={config.alignmentWeight > 0}
             />
           ))}
         </div>

@@ -6,6 +6,31 @@ import {
 
 export type HappinessTone = "great" | "good" | "ok" | "bad" | "neutral";
 
+export const TONE_LABEL: Record<HappinessTone, string> = {
+  great: "Delighted",
+  good: "Happy",
+  ok: "Okay",
+  bad: "Strained",
+  neutral: "No connections",
+};
+
+export interface GuestConnSummary {
+  name: string;
+  label: string;
+}
+
+/** Per-guest breakdown used to explain the happiness score in the tooltip. */
+export interface GuestDetail {
+  score: number;
+  tone: HappinessTone;
+  /** Positive connections seated at the same table, closest first. */
+  friendsHere: GuestConnSummary[];
+  /** Positive connections at other tables, grouped by table number. */
+  friendsElsewhere: Map<number, GuestConnSummary[]>;
+  /** "Keep apart" connections co-seated at this table. */
+  conflicts: GuestConnSummary[];
+}
+
 export interface TableHappiness {
   score: number;
   label: string;
@@ -29,11 +54,11 @@ export interface HappinessReport {
 }
 
 export const HAPPINESS_COLORS: Record<HappinessTone, string> = {
-  great: "#4ad6a0",
-  good: "#6ee7b7",
-  ok: "#f7c948",
-  bad: "#ff5d6c",
-  neutral: "#717b8c",
+  great: "#0f9d7a",
+  good: "#159a5b",
+  ok: "#c9971a",
+  bad: "#d9314a",
+  neutral: "#5c6472",
 };
 
 /** Score for a guest with no relationships at all — they have no preference. */
@@ -209,4 +234,71 @@ export function computeHappiness(
     : 0;
 
   return { guest, table, overall };
+}
+
+/**
+ * Build per-guest detail objects (who's here, who's elsewhere, conflicts)
+ * used to explain happiness scores in the tooltip.
+ */
+export function computeGuestDetails(
+  tables: { guestIds: string[] }[],
+  connections: Connection[],
+  report: HappinessReport,
+  guests: { id: string; name: string }[],
+): Map<string, GuestDetail> {
+  const tableOf = new Map<string, number>();
+  tables.forEach((t, i) => t.guestIds.forEach((id) => tableOf.set(id, i)));
+  const nameOf = new Map(guests.map((g) => [g.id, g.name] as const));
+
+  const details = new Map<string, GuestDetail>();
+
+  for (const [ti, table] of tables.entries()) {
+    for (const guestId of table.guestIds) {
+      const happiness = report.guest.get(guestId);
+      if (!happiness) continue;
+
+      const hereRaw: { name: string; label: string; value: number }[] = [];
+      const elseRaw: { name: string; label: string; tableNum: number; value: number }[] = [];
+      const conflicts: GuestConnSummary[] = [];
+
+      for (const c of connections) {
+        const otherId =
+          c.source === guestId ? c.target
+          : c.target === guestId ? c.source
+          : null;
+        if (!otherId) continue;
+        const otherTi = tableOf.get(otherId);
+        if (otherTi === undefined) continue;
+        const otherName = nameOf.get(otherId) ?? "?";
+
+        if (c.value === KEEP_APART_VALUE) {
+          if (otherTi === ti) conflicts.push({ name: otherName, label: "Keep apart" });
+        } else if (otherTi === ti) {
+          hereRaw.push({ name: otherName, label: c.label ?? "", value: c.value });
+        } else {
+          elseRaw.push({ name: otherName, label: c.label ?? "", tableNum: otherTi, value: c.value });
+        }
+      }
+
+      hereRaw.sort((a, b) => a.value - b.value);
+      elseRaw.sort((a, b) => a.value - b.value);
+
+      const friendsElsewhere = new Map<number, GuestConnSummary[]>();
+      for (const f of elseRaw) {
+        const arr = friendsElsewhere.get(f.tableNum) ?? [];
+        arr.push({ name: f.name, label: f.label });
+        friendsElsewhere.set(f.tableNum, arr);
+      }
+
+      details.set(guestId, {
+        score: happiness.score,
+        tone: happiness.tone,
+        friendsHere: hereRaw,
+        friendsElsewhere,
+        conflicts,
+      });
+    }
+  }
+
+  return details;
 }

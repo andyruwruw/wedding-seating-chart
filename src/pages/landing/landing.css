@@ -1,0 +1,147 @@
+.landing {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 50% -10%, var(--accent-dim), transparent 55%),
+    var(--bg-0);
+}
+
+.landing-nav {
+  width: 100%;
+  max-width: 1040px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px;
+}
+
+.landing-brand {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.landing-hero {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 24px 24px 8px;
+}
+
+.landing-hero-graphic {
+  width: 100%;
+  max-width: 340px;
+  margin-bottom: 8px;
+}
+.landing-hero-graphic svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.hero-edge {
+  stroke-width: 2.2;
+}
+.hero-edge-close {
+  stroke: #1288d8;
+}
+.hero-edge-far {
+  stroke: var(--border-strong);
+}
+.hero-edge-maybe {
+  stroke: #159a5b;
+  stroke-dasharray: 4 4;
+}
+.hero-edge-apart {
+  stroke: var(--danger);
+  stroke-dasharray: 4 4;
+}
+
+.landing-title {
+  font-size: 38px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  max-width: 520px;
+}
+
+.landing-subtitle {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--text-1);
+  max-width: 460px;
+  margin: 0;
+}
+
+.landing-cta-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.landing-cta-row .btn {
+  padding: 12px 28px;
+  font-size: 14px;
+}
+
+.landing-hint {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.landing-features {
+  width: 100%;
+  max-width: 1040px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 48px 24px;
+}
+
+.landing-feature {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.landing-feature h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.landing-feature p {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.landing-footer {
+  width: 100%;
+  max-width: 1040px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 32px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.landing-footer a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.landing-footer a:hover {
+  color: var(--text-0);
+}
+
+@media (max-width: 560px) {
+  .landing-title {
+    font-size: 28px;
+  }
+}

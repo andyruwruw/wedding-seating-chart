@@ -3,6 +3,8 @@ import "./panel.css";
 
 interface PanelProps {
   title: string;
+  /** Muted label rendered before the title — use to show a category or context. */
+  label?: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
@@ -10,11 +12,12 @@ interface PanelProps {
   grow?: boolean;
 }
 
-export function Panel({ title, subtitle, actions, children, grow }: PanelProps) {
+export function Panel({ title, label, subtitle, actions, children, grow }: PanelProps) {
   return (
     <section className={`panel ${grow ? "panel-grow" : ""}`}>
       <header className="panel-head">
         <div className="panel-titles">
+          {label && <span className="panel-label">{label}</span>}
           <h2 className="panel-title">{title}</h2>
           {subtitle && <span className="panel-subtitle">{subtitle}</span>}
         </div>

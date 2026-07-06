@@ -6,29 +6,20 @@ import { useAppStore } from "../../../store/use-app-store";
 import {
   ensureToken,
   getValidToken,
-  invalidateToken,
   isConfigured,
   requestToken,
   signOut,
 } from "../../../lib/google/gis";
 import {
   createSpreadsheet,
-  ensureSheets,
   extractSpreadsheetId,
   getSpreadsheet,
   isSpreadsheetEmpty,
   readTab,
-  TokenExpiredError,
-  writeTab,
 } from "../../../lib/google/sheets";
-import {
-  connectionRows,
-  guestRows,
-  seatingRows,
-  SHEET_TAB_LIST,
-  SHEET_TABS,
-} from "../helpers/sheet-export";
+import { SHEET_TAB_LIST, SHEET_TABS } from "../helpers/sheet-export";
 import { snapshotFromTabs, snapshotSignature } from "../helpers/sheet-import";
+import { pushAllToSheet } from "../helpers/google-sync";
 import {
   getSheetParam,
   setSheetParam,
@@ -53,93 +44,13 @@ export function GoogleSyncPanel() {
   const [pendingSheetId] = useState(() => getSheetParam());
   const [copied, setCopied] = useState(false);
   const autoAttached = useRef(false);
-  const syncing = useRef(false);
-  const queued = useRef(false);
 
   const configured = isConfigured();
 
-  // Push app → sheet, but pull external Guests/Connections edits first rather
-  // than clobber them. Refreshes the token once on a 401.
-  const pushAll = useCallback(async () => {
-    const id = useAppStore.getState().google.spreadsheetId;
-    if (!id) return;
-    if (syncing.current) {
-      queued.current = true;
-      return;
-    }
-    syncing.current = true;
-    setGoogle({ status: "syncing", error: null });
-
-    const doWrites = async (token: string) => {
-      const { guests: gs, connections: cs, result: rs, config } =
-        useAppStore.getState();
-      const lastSig = useAppStore.getState().google.lastSig;
-      const appSig = snapshotSignature(gs, cs);
-
-      // If the sheet's editable data changed under us, adopt it instead.
-      const gRows = await readTab(token, id, SHEET_TABS.guests).catch(() => []);
-      const cRows = await readTab(token, id, SHEET_TABS.connections).catch(() => []);
-      const sheetSnap = snapshotFromTabs(gRows, cRows);
-      if (sheetSnap.guests.length > 0) {
-        const sheetSig = snapshotSignature(sheetSnap.guests, sheetSnap.connections);
-        if (sheetSig !== lastSig && sheetSig !== appSig) {
-          loadSnapshot(sheetSnap, false);
-          setGoogle({
-            lastSig: sheetSig,
-            status: "synced",
-            lastSyncedAt: Date.now(),
-          });
-          return;
-        }
-      }
-
-      await ensureSheets(token, id, SHEET_TAB_LIST);
-      await writeTab(
-        token,
-        id,
-        SHEET_TABS.seating,
-        seatingRows(gs, cs, rs, config.taper, config.fomo, config.worstCaseScore),
-      );
-      if (appSig !== lastSig) {
-        await writeTab(token, id, SHEET_TABS.guests, guestRows(gs, cs, rs));
-        await writeTab(token, id, SHEET_TABS.connections, connectionRows(gs, cs));
-      }
-      setGoogle({
-        status: "synced",
-        lastSyncedAt: Date.now(),
-        lastSig: appSig,
-        error: null,
-      });
-    };
-
-    try {
-      let token = await ensureToken();
-      try {
-        await doWrites(token);
-      } catch (err) {
-        if (err instanceof TokenExpiredError) {
-          invalidateToken();
-          token = await ensureToken();
-          await doWrites(token);
-        } else {
-          throw err;
-        }
-      }
-    } catch (err) {
-      setGoogle({ status: "error", error: (err as Error).message });
-    } finally {
-      syncing.current = false;
-      if (queued.current) {
-        queued.current = false;
-        pushAll();
-      }
-    }
-  }, [setGoogle, loadSnapshot]);
-
   // Poll the sheet and pull in external edits (silent — never prompts).
   const pullFromSheet = useCallback(async () => {
-    const { spreadsheetId: id, lastSig } = useAppStore.getState().google;
-    if (!id || syncing.current) return;
+    const { spreadsheetId: id, lastSig, status } = useAppStore.getState().google;
+    if (!id || status === "syncing") return;
     const token = getValidToken();
     if (!token) return;
     try {
@@ -160,9 +71,9 @@ export function GoogleSyncPanel() {
   // Debounced live push whenever app data changes.
   useEffect(() => {
     if (!google.autoSync || !google.spreadsheetId) return;
-    const timer = setTimeout(pushAll, SYNC_DEBOUNCE_MS);
+    const timer = setTimeout(pushAllToSheet, SYNC_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [guests, connections, result, google.autoSync, google.spreadsheetId, pushAll]);
+  }, [guests, connections, result, google.autoSync, google.spreadsheetId]);
 
   // Poll for external sheet edits.
   useEffect(() => {
@@ -193,7 +104,7 @@ export function GoogleSyncPanel() {
         spreadsheetUrl: sheet.spreadsheetUrl,
         spreadsheetTitle: sheet.title,
       });
-      pushAll();
+      pushAllToSheet();
     } catch (err) {
       setGoogle({ status: "error", error: (err as Error).message });
     }
@@ -261,12 +172,12 @@ export function GoogleSyncPanel() {
         spreadsheetTitle: title,
       });
       setUrlInput("");
-      pushAll();
+      pushAllToSheet();
     } catch (err) {
       setGoogle({ status: "error", error: (err as Error).message });
     }
     },
-    [urlInput, setGoogle, loadSnapshot, pushAll],
+    [urlInput, setGoogle, loadSnapshot],
   );
 
   // A shared `?sheet=<id>` link: once signed in, attach to it automatically.
@@ -440,7 +351,7 @@ export function GoogleSyncPanel() {
             <Button
               variant="primary"
               block
-              onClick={pushAll}
+              onClick={pushAllToSheet}
               disabled={google.status === "syncing"}
             >
               {google.status === "syncing" ? "Syncing…" : "Sync now"}

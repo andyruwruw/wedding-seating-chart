@@ -1,31 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { GuestPanel } from "./components/guest-panel";
 import { ConnectionEditor } from "./components/connection-editor";
-import { GroupConnect } from "./components/group-connect";
-import { GraphSettings } from "./components/graph-settings";
 import { GraphView } from "./components/graph-view";
 import { TablesView } from "./components/tables-view";
 import { SeatingPanel } from "./components/seating-panel";
 import { GoogleSyncPanel } from "./components/google-sync-panel";
+import { SidebarNav, type NavTab } from "./components/sidebar-nav";
 import { useAppStore } from "../../store/use-app-store";
 import "./seating-chart.css";
 
 type CenterView = "graph" | "tables";
-type LeftTab = "guests" | "connections" | "groups" | "graph";
-
-const LEFT_TABS: { id: LeftTab; label: string }[] = [
-  { id: "guests", label: "Guests" },
-  { id: "connections", label: "Connections" },
-  { id: "groups", label: "Groups" },
-  { id: "graph", label: "Graph" },
-];
 
 export function SeatingChart() {
   const result = useAppStore((s) => s.result);
   const isGenerating = useAppStore((s) => s.isGenerating);
   const selectedGuestId = useAppStore((s) => s.selectedGuestId);
   const [view, setView] = useState<CenterView>("graph");
-  const [leftTab, setLeftTab] = useState<LeftTab>("guests");
+  const [navTab, setNavTab] = useState<NavTab>("guests");
 
   // Jump to the table visual the moment a chart is (re)generated.
   const hadResult = useRef(false);
@@ -36,30 +27,14 @@ export function SeatingChart() {
 
   // Selecting a guest jumps to the Connections tab to edit their links.
   useEffect(() => {
-    if (selectedGuestId) setLeftTab("connections");
+    if (selectedGuestId) setNavTab("connections");
   }, [selectedGuestId]);
 
   return (
     <div className="seating-chart">
-      <aside className="col col-left">
-        <div className="left-tabs">
-          {LEFT_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              className={`left-tab ${leftTab === tab.id ? "left-tab-active" : ""}`}
-              onClick={() => setLeftTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="left-body">
-          {leftTab === "guests" && <GuestPanel />}
-          {leftTab === "connections" && <ConnectionEditor />}
-          {leftTab === "groups" && <GroupConnect />}
-          {leftTab === "graph" && <GraphSettings />}
-        </div>
-      </aside>
+      <div className="col col-nav">
+        <SidebarNav active={navTab} onChange={setNavTab} />
+      </div>
 
       <main className="col col-center">
         {result && (
@@ -89,9 +64,17 @@ export function SeatingChart() {
         </div>
       </main>
 
-      <aside className="col col-right">
-        <SeatingPanel />
-        <GoogleSyncPanel />
+      <aside className="col col-left">
+        <div className="left-body">
+          {navTab === "guests" && <GuestPanel />}
+          {navTab === "connections" && <ConnectionEditor />}
+          {navTab === "seating" && (
+            <>
+              <SeatingPanel />
+              <GoogleSyncPanel />
+            </>
+          )}
+        </div>
       </aside>
     </div>
   );

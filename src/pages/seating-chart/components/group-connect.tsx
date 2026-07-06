@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Panel } from "../../../components/layout/panel";
 import { Button } from "../../../components/form/button";
 import { TextField } from "../../../components/form/text-field";
 import { Select } from "../../../components/form/select";
@@ -64,16 +63,14 @@ export function GroupConnect() {
 
   if (guests.length === 0) {
     return (
-      <Panel title="Groups" grow>
-        <p className="empty-hint">
-          Add some guests first, then come back to connect a whole group at once.
-        </p>
-      </Panel>
+      <p className="empty-hint">
+        Add some guests first, then come back to connect a whole group at once.
+      </p>
     );
   }
 
   return (
-    <Panel title="Groups" subtitle="connect many at once" grow>
+    <>
       <p className="empty-hint">
         Pick a group and a closeness — everyone in it gets linked to everyone
         else (a clique).
@@ -143,6 +140,6 @@ export function GroupConnect() {
             : `Added ${lastAdded} connection${lastAdded === 1 ? "" : "s"}.`}
         </p>
       )}
-    </Panel>
+    </>
   );
 }

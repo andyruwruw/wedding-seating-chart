@@ -1,6 +1,15 @@
-import type { Connection, Guest, ProjectSnapshot } from "../../../types";
+import type { Connection, DndAlignment, Guest, ProjectSnapshot } from "../../../types";
 import { resolveTier } from "../../../components/form/config/relationship-tiers";
 import { pairKey } from "../../../store/use-app-store";
+
+const VALID_ALIGNMENTS = new Set<string>([
+  "LG", "NG", "CG", "LN", "TN", "CN", "LE", "NE", "CE",
+]);
+
+function parseAlignment(raw: string): DndAlignment {
+  const upper = raw.trim().toUpperCase();
+  return VALID_ALIGNMENTS.has(upper) ? (upper as DndAlignment) : "TN";
+}
 
 /**
  * A name-based, order-independent fingerprint of the guests + connections.
@@ -15,7 +24,7 @@ export function snapshotSignature(
     guests.map((g) => [g.id, g.name.trim().toLowerCase()] as const),
   );
   const gPart = guests
-    .map((g) => g.name.trim().toLowerCase())
+    .map((g) => `${g.name.trim().toLowerCase()}:${g.alignment ?? "TN"}`)
     .sort()
     .join("|");
   const cPart = connections
@@ -57,15 +66,27 @@ export function snapshotFromTabs(
     if (existing) return existing;
     const id = makeId();
     idByName.set(key, id);
-    guests.push({ id, name: trimmed });
+    // Alignment will be set in a second pass; default TN for guests from connections tab.
+    guests.push({ id, name: trimmed, alignment: "TN" });
     return id;
   };
 
-  // Guests tab — column A is the name; skip a "Name" header if present.
+  // Guests tab — column A: name, column D: alignment.
+  // Skip a "Name" header row if present.
+  const alignmentByKey = new Map<string, DndAlignment>();
   let gi = guestRows[0] && cell(guestRows[0], 0).toLowerCase() === "name" ? 1 : 0;
   for (; gi < guestRows.length; gi++) {
     const name = cell(guestRows[gi], 0);
-    if (name) ensureGuest(name);
+    if (!name) continue;
+    ensureGuest(name);
+    alignmentByKey.set(
+      name.trim().toLowerCase(),
+      parseAlignment(cell(guestRows[gi], 3)),
+    );
+  }
+  // Apply parsed alignments (TN for any guest not in the Guests tab).
+  for (const g of guests) {
+    g.alignment = alignmentByKey.get(g.name.toLowerCase()) ?? "TN";
   }
 
   // Connections tab — Source, Target, Relationship; skip a header if present.

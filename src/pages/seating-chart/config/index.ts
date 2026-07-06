@@ -6,18 +6,18 @@ import type { SelectOption } from "../../../components/form/select";
 
 /** Distinct, readable colors used to tint tables (and their nodes in the graph). */
 export const TABLE_PALETTE = [
-  "#8b7cff", // violet
-  "#4ad6a0", // mint
-  "#ff9f6e", // coral
-  "#5cc8ff", // sky
-  "#f7c948", // gold
-  "#ff7eb6", // pink
-  "#9d7bff", // purple
-  "#6ee7b7", // green
-  "#f6a5c0", // rose
-  "#7dd3fc", // cyan
-  "#fbbf72", // amber
-  "#b794f6", // lilac
+  "#6d4fe6", // violet
+  "#0f9d7a", // mint
+  "#e2652a", // coral
+  "#1288d8", // sky
+  "#c9971a", // gold
+  "#d6408f", // pink
+  "#8b3fe0", // purple
+  "#159a5b", // green
+  "#cc4570", // rose
+  "#0f9bc4", // cyan
+  "#b8720f", // amber
+  "#9855e0", // lilac
 ];
 
 export function tableColor(index: number): string {

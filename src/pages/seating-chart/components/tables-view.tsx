@@ -1,15 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../../store/use-app-store";
 import { linkStyle } from "../../../components/graph/helpers";
 import { tableColor } from "../config";
 import {
   computeHappiness,
+  computeGuestDetails,
   HAPPINESS_COLORS,
   makeMultLookup,
+  type GuestDetail,
   type GuestHappiness,
   type TableHappiness,
 } from "../helpers/happiness";
 import type { Connection } from "../../../types";
+import { GuestTooltip } from "./guest-tooltip";
 
 const SIZE = 272;
 const CX = SIZE / 2;
@@ -33,6 +36,7 @@ function TableCircle({
   connections,
   guestHappy,
   happiness,
+  guestDetails,
 }: {
   index: number;
   guestIds: string[];
@@ -40,9 +44,26 @@ function TableCircle({
   connections: Connection[];
   guestHappy: Map<string, GuestHappiness>;
   happiness: TableHappiness;
+  guestDetails: Map<string, GuestDetail>;
 }) {
   const color = tableColor(index);
   const toneColor = HAPPINESS_COLORS[happiness.tone];
+
+  const [tooltipState, setTooltipState] = useState<{
+    guestId: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showTooltip = (guestId: string, e: React.MouseEvent<SVGElement>) => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    const rect = (e.currentTarget as SVGGraphicsElement).getBoundingClientRect();
+    setTooltipState({ guestId, anchorRect: rect });
+  };
+
+  const hideTooltip = () => {
+    hideTimer.current = setTimeout(() => setTooltipState(null), 120);
+  };
 
   const seats: Seat[] = guestIds.map((id, i) => {
     const angle = (-90 + (360 * i) / guestIds.length) * (Math.PI / 180);
@@ -59,7 +80,6 @@ function TableCircle({
   });
   const seatById = new Map(seats.map((s) => [s.id, s] as const));
 
-  // Chords between co-seated, connected guests.
   const member = new Set(guestIds);
   const chords = connections
     .filter((c) => member.has(c.source) && member.has(c.target))
@@ -68,6 +88,9 @@ function TableCircle({
       const b = seatById.get(c.target)!;
       return { a, b, ...linkStyle(c.value) };
     });
+
+  const tooltipGuest = tooltipState ? seats.find((s) => s.id === tooltipState.guestId) : null;
+  const tooltipDetail = tooltipState ? (guestDetails.get(tooltipState.guestId) ?? null) : null;
 
   return (
     <div className="table-tile">
@@ -89,69 +112,48 @@ function TableCircle({
         role="img"
         aria-label={`Table ${index + 1}, ${happiness.label}`}
       >
-        {/* table surface */}
-        <circle
-          cx={CX}
-          cy={CY}
-          r={R}
-          fill={`${color}14`}
-          stroke={color}
-          strokeWidth={1.5}
-        />
+        <circle cx={CX} cy={CY} r={R} fill={`${color}14`} stroke={color} strokeWidth={1.5} />
 
-        {/* relationship chords */}
         {chords.map((c, i) => (
           <line
             key={i}
-            x1={c.a.x}
-            y1={c.a.y}
-            x2={c.b.x}
-            y2={c.b.y}
+            x1={c.a.x} y1={c.a.y}
+            x2={c.b.x} y2={c.b.y}
             stroke={c.color}
             strokeWidth={c.width}
             strokeDasharray={c.dashed ? "3 3" : undefined}
           />
         ))}
 
-        {/* center happiness disc */}
-        <circle
-          cx={CX}
-          cy={CY}
-          r={32}
-          style={{ fill: "var(--bg-1)", stroke: "var(--border)" }}
-        />
-        <text
-          x={CX}
-          y={CY - 4}
-          textAnchor="middle"
-          className="table-score"
-          fill={toneColor}
-        >
+        <circle cx={CX} cy={CY} r={32} style={{ fill: "var(--bg-1)", stroke: "var(--border)" }} />
+        <text x={CX} y={CY - 4} textAnchor="middle" className="table-score" fill={toneColor}>
           {happiness.score}
         </text>
         <text x={CX} y={CY + 13} textAnchor="middle" className="table-score-sub">
           happy
         </text>
 
-        {/* seats + names, tinted by each guest's personal happiness */}
         {seats.map((s) => {
           const anchor = s.cos > 0.3 ? "start" : s.cos < -0.3 ? "end" : "middle";
           const lx = CX + (R + 13) * ((s.x - CX) / R);
           const ly = CY + (R + 13) * ((s.y - CY) / R);
           return (
-            <g key={s.id}>
-              <title>{`${s.name} · ${s.score} happy`}</title>
+            <g
+              key={s.id}
+              style={{ cursor: "default" }}
+              onMouseEnter={(e) => showTooltip(s.id, e)}
+              onMouseLeave={hideTooltip}
+            >
               <circle
-                cx={s.x}
-                cy={s.y}
-                r={5}
+                cx={s.x} cy={s.y} r={5}
                 fill={s.color}
                 style={{ stroke: "var(--bg-0)" }}
                 strokeWidth={1.5}
               />
+              {/* Invisible larger hit area so the hover is easy to trigger */}
+              <circle cx={s.x} cy={s.y} r={12} fill="transparent" />
               <text
-                x={lx}
-                y={ly}
+                x={lx} y={ly}
                 textAnchor={anchor}
                 dominantBaseline="middle"
                 className="seat-name"
@@ -163,6 +165,14 @@ function TableCircle({
           );
         })}
       </svg>
+
+      {tooltipState && tooltipGuest && (
+        <GuestTooltip
+          name={tooltipGuest.name}
+          detail={tooltipDetail}
+          anchorRect={tooltipState.anchorRect}
+        />
+      )}
     </div>
   );
 }
@@ -183,16 +193,14 @@ export function TablesView() {
   const report = useMemo(
     () =>
       result
-        ? computeHappiness(
-            result.tables,
-            connections,
-            taper,
-            fomo,
-            makeMultLookup(guests),
-            worstCase,
-          )
+        ? computeHappiness(result.tables, connections, taper, fomo, makeMultLookup(guests), worstCase)
         : null,
     [result, connections, taper, fomo, worstCase, guests],
+  );
+
+  const guestDetails = useMemo(
+    () => result && report ? computeGuestDetails(result.tables, connections, report, guests) : null,
+    [result, connections, report, guests],
   );
 
   if (!result || !report) {
@@ -206,7 +214,7 @@ export function TablesView() {
   return (
     <div className="tables-pane">
       <div className="tables-legend">
-        <span className="section-label">Guests tinted by personal happiness</span>
+        <span className="section-label">Hover a name to see why</span>
         <span className="tl-key">
           <i className="tl-dot" style={{ background: HAPPINESS_COLORS.great }} />
           happy
@@ -231,6 +239,7 @@ export function TablesView() {
             connections={connections}
             guestHappy={report.guest}
             happiness={report.table[i]}
+            guestDetails={guestDetails ?? new Map()}
           />
         ))}
       </div>

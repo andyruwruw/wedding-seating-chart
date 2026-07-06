@@ -11,6 +11,7 @@ import {
   KEEP_TOGETHER_LABELS,
 } from "../../../components/form/config/relationship-tiers";
 import { feltScore, makeMultLookup, personalShortfall } from "./happiness";
+import { alignmentCompatibility } from "./alignment";
 
 /**
  * Penalty per co-seated "must not sit together" pair. Felt-happiness per guest
@@ -152,7 +153,7 @@ export function solveSeating(
   const n = ids.length;
   if (n === 0) return { tables: [], score: 0, violations: [], seed };
 
-  const { taper, fomo: globalFomo, cohesion } = config;
+  const { taper, fomo: globalFomo, cohesion, alignmentWeight, worstBehavior } = config;
   const multOf = makeMultLookup(guests);
   const aff = buildAffinities(connections, taper);
   const capacities = computeCapacities(n, config);
@@ -178,6 +179,28 @@ export function solveSeating(
       friends.get(c.target)!.push([c.source, a]);
       totalW.set(c.source, totalW.get(c.source)! + a);
       totalW.set(c.target, totalW.get(c.target)! + a);
+    }
+  }
+
+  // --- Alignment pairs: soft affinity for disconnected guests with compatible alignments.
+  const alignPartners = new Map<string, Array<[string, number]>>();
+  const totalAlignW = new Map<string, number>();
+  for (const id of ids) { alignPartners.set(id, []); totalAlignW.set(id, 0); }
+  if (alignmentWeight > 0) {
+    const connSet = new Set(connections.map((c) => orderedKey(c.source, c.target)));
+    for (let i = 0; i < guests.length; i++) {
+      for (let j = i + 1; j < guests.length; j++) {
+        const ga = guests[i];
+        const gb = guests[j];
+        if (!ga.alignment || !gb.alignment) continue;
+        if (connSet.has(orderedKey(ga.id, gb.id))) continue;
+        const compat = alignmentCompatibility(ga.alignment, gb.alignment);
+        if (compat <= 0) continue;
+        alignPartners.get(ga.id)!.push([gb.id, compat]);
+        alignPartners.get(gb.id)!.push([ga.id, compat]);
+        totalAlignW.set(ga.id, totalAlignW.get(ga.id)! + compat);
+        totalAlignW.set(gb.id, totalAlignW.get(gb.id)! + compat);
+      }
     }
   }
 
@@ -222,8 +245,8 @@ export function solveSeating(
     while (tableMembers[tbl].length < cap && unassigned.size > 0) {
       const remaining = cap - tableMembers[tbl].length;
       let bestRoot = "";
-      let bestScore = -Infinity;
-      let bestConflicts = Infinity;
+      let bestScore = worstBehavior ? Infinity : -Infinity;
+      let bestConflicts = worstBehavior ? -Infinity : Infinity;
       for (const root of unassigned) {
         if (sizeOf(root) > remaining) continue;
         const conflicts = conflictsWithTable(root, tableMembers[tbl]);
@@ -232,13 +255,25 @@ export function solveSeating(
             ? affinityToTable(root, tableMembers[tbl])
             : unitDegree.get(root)!;
         const s = pull + rng() * 0.001;
-        if (
-          conflicts < bestConflicts ||
-          (conflicts === bestConflicts && s > bestScore)
-        ) {
-          bestConflicts = conflicts;
-          bestScore = s;
-          bestRoot = root;
+        // In worst mode: prefer units with most conflicts and lowest pull.
+        if (worstBehavior) {
+          if (
+            conflicts > bestConflicts ||
+            (conflicts === bestConflicts && s < bestScore)
+          ) {
+            bestConflicts = conflicts;
+            bestScore = s;
+            bestRoot = root;
+          }
+        } else {
+          if (
+            conflicts < bestConflicts ||
+            (conflicts === bestConflicts && s > bestScore)
+          ) {
+            bestConflicts = conflicts;
+            bestScore = s;
+            bestRoot = root;
+          }
         }
       }
       if (bestRoot === "") break;
@@ -274,6 +309,14 @@ export function solveSeating(
     cwt.set(id, cf);
   }
 
+  // Alignment-weight-per-table, parallel to fwt/cwt.
+  const alw = new Map<string, number[]>();
+  for (const id of ids) {
+    const w = new Array(tableCount).fill(0);
+    for (const [p, compat] of alignPartners.get(id)!) w[tableOf.get(p)!] += compat;
+    alw.set(id, w);
+  }
+
   // Per-person objective: minimise each guest's "shortfall" (1 − felt) raised to
   // a convex power that grows with their (personal × global) FOMO. A few badly-
   // left-out guests cost more than many mildly-imperfect ones, so the optimiser
@@ -300,7 +343,10 @@ export function solveSeating(
       const shortfall = personalShortfall(NEUTRAL_FELT, multOf(id));
       term = -Math.pow(shortfall, 1 + globalFomo);
     }
-    return term - 0.5 * CONFLICT_PENALTY * cwt.get(id)![tp];
+    const alTotal = totalAlignW.get(id)!;
+    const alBonus =
+      alTotal > 0 ? alignmentWeight * (alw.get(id)![tp] / alTotal) : 0;
+    return term - 0.5 * CONFLICT_PENALTY * cwt.get(id)![tp] + alBonus;
   };
 
   // Shared helpers for the hill-climb.
@@ -316,6 +362,11 @@ export function solveSeating(
         cf[from] -= 1;
         cf[to] += 1;
       }
+      for (const [p, compat] of alignPartners.get(m)!) {
+        const aw = alw.get(p)!;
+        aw[from] -= compat;
+        aw[to] += compat;
+      }
       tableOf.set(m, to);
     }
   };
@@ -326,13 +377,15 @@ export function solveSeating(
       affected.add(m);
       for (const [f] of friends.get(m)!) affected.add(f);
       for (const c of conflictPartners.get(m)!) affected.add(c);
+      for (const [p] of alignPartners.get(m)!) affected.add(p);
     }
     let before = 0;
     for (const id of affected) before += objOf(id);
     apply(moved);
     let after = 0;
     for (const id of affected) after += objOf(id);
-    if (after > before) return true;
+    // In worst mode: accept moves that make things worse.
+    if (worstBehavior ? after < before : after > before) return true;
     apply(moved.map(([m, from, to]) => [m, to, from])); // revert
     return false;
   };

@@ -29,13 +29,13 @@ export function guestRows(
   result?.tables.forEach((t, i) =>
     t.guestIds.forEach((id) => tableOf.set(id, i)),
   );
-  const rows: CellValue[][] = [["Name", "Connections", "Table"]];
+  const rows: CellValue[][] = [["Name", "Connections", "Table", "Alignment"]];
   for (const g of guests) {
     const count = connections.filter(
       (c) => c.source === g.id || c.target === g.id,
     ).length;
     const tbl = tableOf.has(g.id) ? `Table ${tableOf.get(g.id)! + 1}` : "";
-    rows.push([g.name, count, tbl]);
+    rows.push([g.name, count, tbl, g.alignment ?? "TN"]);
   }
   return rows;
 }

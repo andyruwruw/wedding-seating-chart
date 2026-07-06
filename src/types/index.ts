@@ -1,9 +1,17 @@
+/** The nine D&D alignments on the classic 3×3 law/moral grid. */
+export type DndAlignment =
+  | "LG" | "NG" | "CG"
+  | "LN" | "TN" | "CN"
+  | "LE" | "NE" | "CE";
+
 /** A wedding guest / invitee. */
 export interface Guest {
   id: string;
   name: string;
   /** Personal FOMO multiplier on the global setting (1 = normal). */
   fomo?: number;
+  /** Optional D&D alignment for fun compatibility hints at mixed tables. */
+  alignment?: DndAlignment;
 }
 
 /**
@@ -69,6 +77,16 @@ export interface SeatingConfig {
    * their friends at their table, so cliques resist being split. 0 = off.
    */
   cohesion: number;
+  /**
+   * How much D&D alignment compatibility influences seating of disconnected guests.
+   * 0 = ignored; higher values increasingly prefer compatible strangers together.
+   */
+  alignmentWeight: number;
+  /**
+   * Invert the objective: actively seat enemies together, split friends apart.
+   * For maximum chaos — diagnostic or entertainment use only.
+   */
+  worstBehavior: boolean;
 }
 
 /** One table in a generated seating chart. */

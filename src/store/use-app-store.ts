@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   Connection,
+  DndAlignment,
   Guest,
   GraphSettings,
   ProjectSnapshot,
@@ -71,6 +72,7 @@ interface AppState {
   removeGuest: (id: string) => void;
   renameGuest: (id: string, name: string) => void;
   setGuestFomo: (id: string, fomo: number) => void;
+  setGuestAlignment: (id: string, alignment: DndAlignment | undefined) => void;
   selectGuest: (id: string | null) => void;
 
   setConnection: (source: string, target: string, label: string) => void;
@@ -84,6 +86,10 @@ interface AppState {
     label: string,
     overwrite: boolean,
   ) => number;
+
+  /** Controls how the force graph colors its nodes. */
+  graphColorMode: "table" | "alignment";
+  setGraphColorMode: (mode: "table" | "alignment") => void;
 
   setConfig: (patch: Partial<SeatingConfig>) => void;
   setGraphSettings: (patch: Partial<GraphSettings>) => void;
@@ -108,6 +114,8 @@ const DEFAULT_CONFIG: SeatingConfig = {
   fomo: 1,
   worstCaseScore: false,
   cohesion: 1,
+  alignmentWeight: 0,
+  worstBehavior: false,
 };
 
 export const DEFAULT_GRAPH_SETTINGS: GraphSettings = {
@@ -125,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isGenerating: false,
   selectedGuestId: null,
   graphSettings: DEFAULT_GRAPH_SETTINGS,
+  graphColorMode: "table",
   google: DEFAULT_GOOGLE,
 
   addGuest: (name) => {
@@ -134,7 +143,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       (g) => g.name.toLowerCase() === trimmed.toLowerCase(),
     );
     if (exists) return null;
-    const guest: Guest = { id: makeId(), name: trimmed, fomo: 1 };
+    const guest: Guest = { id: makeId(), name: trimmed, fomo: 1, alignment: "TN" };
     set((s) => ({ guests: [...s.guests, guest] }));
     return guest;
   },
@@ -160,6 +169,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGuestFomo: (id, fomo) =>
     set((s) => ({
       guests: s.guests.map((g) => (g.id === id ? { ...g, fomo } : g)),
+    })),
+
+  setGuestAlignment: (id, alignment) =>
+    set((s) => ({
+      guests: s.guests.map((g) => (g.id === id ? { ...g, alignment } : g)),
     })),
 
   selectGuest: (id) => set({ selectedGuestId: id }),
@@ -213,6 +227,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return changed;
   },
+
+  setGraphColorMode: (mode) => set({ graphColorMode: mode }),
 
   setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
 

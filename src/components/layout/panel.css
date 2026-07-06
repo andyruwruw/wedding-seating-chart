@@ -29,6 +29,12 @@
   min-width: 0;
 }
 
+.panel-label {
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
 .panel-title {
   font-size: 13px;
   font-weight: 600;
