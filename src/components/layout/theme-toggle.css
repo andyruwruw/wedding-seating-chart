@@ -1,0 +1,39 @@
+.theme-toggle-btn {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-1);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: color 0.12s, border-color 0.12s, transform 0.12s, background 0.15s;
+}
+.theme-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.theme-toggle-btn:hover {
+  color: var(--text-0);
+  border-color: var(--border-strong);
+  transform: scale(1.06);
+}
+
+/* Standalone (landing page): pinned to the viewport corner. */
+.theme-toggle-fixed {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1000;
+}
+
+/* Embedded in the app sidebar: bottom of the column, centered horizontally. */
+.theme-toggle-inline {
+  align-self: center;
+  margin-top: auto;
+}

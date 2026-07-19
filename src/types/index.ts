@@ -93,6 +93,8 @@ export interface SeatingConfig {
 export interface SeatingTable {
   id: string;
   guestIds: string[];
+  /** Locked tables keep this exact guest list across every regeneration. */
+  locked?: boolean;
 }
 
 export interface SeatingResult {
@@ -109,4 +111,6 @@ export interface SeatingResult {
 export interface ProjectSnapshot {
   guests: Guest[];
   connections: Connection[];
+  /** Locked table groups (by guest id), when the source carries them. */
+  lockedTables?: SeatingTable[];
 }

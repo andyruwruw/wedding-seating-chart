@@ -7,6 +7,7 @@ import type {
   ProjectSnapshot,
   SeatingConfig,
   SeatingResult,
+  SeatingTable,
 } from "../types";
 import { solveSeating } from "../pages/seating-chart/helpers/seating";
 import { valueForLabel } from "../components/form/config/relationship-tiers";
@@ -67,6 +68,8 @@ interface AppState {
   selectedGuestId: string | null;
   graphSettings: GraphSettings;
   google: GoogleSyncState;
+  /** Guest groups pinned to their own table, unchanged by any regeneration. */
+  lockedTables: SeatingTable[];
 
   addGuest: (name: string) => Guest | null;
   removeGuest: (id: string) => void;
@@ -99,6 +102,8 @@ interface AppState {
 
   generate: () => void;
   regenerate: () => void;
+  /** Toggle whether the table currently holding this id stays fixed forever. */
+  toggleTableLock: (tableId: string) => void;
 
   loadSnapshot: (snapshot: ProjectSnapshot, merge?: boolean) => void;
   clearAll: () => void;
@@ -125,6 +130,26 @@ export const DEFAULT_GRAPH_SETTINGS: GraphSettings = {
   linkDistance: 20,
 };
 
+/** Shared by `generate`/`regenerate`: prune stale locks, then re-solve. */
+function runSolve(
+  set: (partial: Partial<AppState>) => void,
+  get: () => AppState,
+) {
+  set({ isGenerating: true });
+  setTimeout(() => {
+    const { guests, connections, config, lockedTables } = get();
+    const validIds = new Set(guests.map((g) => g.id));
+    const prunedLocks = lockedTables
+      .map((lt) => ({ ...lt, guestIds: lt.guestIds.filter((id) => validIds.has(id)) }))
+      .filter((lt) => lt.guestIds.length > 0);
+    set({
+      result: solveSeating(guests, connections, config, makeSeed(), prunedLocks),
+      lockedTables: prunedLocks,
+      isGenerating: false,
+    });
+  }, 0);
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   guests: [],
   connections: [],
@@ -135,6 +160,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   graphSettings: DEFAULT_GRAPH_SETTINGS,
   graphColorMode: "table",
   google: DEFAULT_GOOGLE,
+  lockedTables: [],
 
   addGuest: (name) => {
     const trimmed = name.trim();
@@ -241,29 +267,33 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   resetGoogle: () => set({ google: DEFAULT_GOOGLE }),
 
-  generate: () => {
-    // Defer the (synchronous, possibly heavy) solve so the UI can paint the
-    // loading overlay before the main thread blocks on it.
-    set({ isGenerating: true });
-    setTimeout(() => {
-      const { guests, connections, config } = get();
-      set({
-        result: solveSeating(guests, connections, config, makeSeed()),
-        isGenerating: false,
-      });
-    }, 0);
-  },
+  generate: () => runSolve(set, get),
 
-  regenerate: () => {
-    set({ isGenerating: true });
-    setTimeout(() => {
-      const { guests, connections, config } = get();
-      set({
-        result: solveSeating(guests, connections, config, makeSeed()),
-        isGenerating: false,
-      });
-    }, 0);
-  },
+  regenerate: () => runSolve(set, get),
+
+  toggleTableLock: (tableId) =>
+    set((s) => {
+      if (!s.result) return {};
+      const idx = s.result.tables.findIndex((t) => t.id === tableId);
+      if (idx === -1) return {};
+      const table = s.result.tables[idx];
+      if (table.locked) {
+        const lockedTables = s.lockedTables.filter((lt) => lt.id !== tableId);
+        const tables = s.result.tables.map((t, i) =>
+          i === idx ? { ...t, locked: false } : t,
+        );
+        return { lockedTables, result: { ...s.result, tables } };
+      }
+      const lockId = `lock-${makeId()}`;
+      const lockedTables = [
+        ...s.lockedTables,
+        { id: lockId, guestIds: table.guestIds },
+      ];
+      const tables = s.result.tables.map((t, i) =>
+        i === idx ? { ...t, id: lockId, locked: true } : t,
+      );
+      return { lockedTables, result: { ...s.result, tables } };
+    }),
 
   loadSnapshot: (snapshot, merge = false) =>
     set((s) => {
@@ -273,6 +303,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           connections: snapshot.connections,
           result: null,
           selectedGuestId: null,
+          lockedTables: snapshot.lockedTables ?? [],
         };
       }
       // Merge: keep existing, append guests/connections not already present.
@@ -306,5 +337,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       connections: [],
       result: null,
       selectedGuestId: null,
+      lockedTables: [],
     }),
 }));

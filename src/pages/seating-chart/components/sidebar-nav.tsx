@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { ThemeToggle } from "../../../components/layout/theme-toggle";
+import { useThemeStore } from "../../../store/use-theme-store";
 import "./sidebar-nav.css";
 
-export type NavTab = "guests" | "connections" | "seating";
+export type NavTab = "guests" | "connections" | "seating" | "google";
 
 interface NavItem {
   id: NavTab;
@@ -53,6 +55,18 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    id: "google",
+    label: "Google Sync",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M17 10.2c0-.6-.05-1.1-.15-1.6H10v3.1h3.9a3.4 3.4 0 0 1-1.45 2.2v1.8h2.35c1.37-1.26 2.2-3.1 2.2-5.5z" />
+        <path d="M10 17.5c1.95 0 3.6-.65 4.8-1.75l-2.35-1.8c-.65.44-1.5.7-2.45.7-1.9 0-3.5-1.28-4.07-3H3.5v1.85A7.5 7.5 0 0 0 10 17.5z" />
+        <path d="M5.93 11.65a4.5 4.5 0 0 1 0-2.9V6.9H3.5a7.5 7.5 0 0 0 0 6.6l2.43-1.85z" />
+        <path d="M10 6.25c1.06 0 2 .37 2.75 1.08l2.06-2.06A7.1 7.1 0 0 0 10 3.5a7.5 7.5 0 0 0-6.5 3.4l2.43 1.85c.57-1.72 2.17-3 4.07-3z" />
+      </svg>
+    ),
+  },
 ];
 
 interface SidebarNavProps {
@@ -61,6 +75,9 @@ interface SidebarNavProps {
 }
 
 export function SidebarNav({ active, onChange }: SidebarNavProps) {
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+
   return (
     <nav className="sidebar-nav">
       {NAV_ITEMS.map((item) => (
@@ -76,6 +93,7 @@ export function SidebarNav({ active, onChange }: SidebarNavProps) {
           <span className="sidebar-nav-label">{item.label}</span>
         </button>
       ))}
+      <ThemeToggle theme={theme} onToggle={toggleTheme} className="theme-toggle-inline" />
     </nav>
   );
 }

@@ -112,7 +112,7 @@
 
 .btn-primary {
   background: var(--accent);
-  color: #14111f;
+  color: #ffffff;
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-soft);

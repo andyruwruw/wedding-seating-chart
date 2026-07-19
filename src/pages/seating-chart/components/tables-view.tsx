@@ -37,6 +37,8 @@ function TableCircle({
   guestHappy,
   happiness,
   guestDetails,
+  locked,
+  onToggleLock,
 }: {
   index: number;
   guestIds: string[];
@@ -45,6 +47,8 @@ function TableCircle({
   guestHappy: Map<string, GuestHappiness>;
   happiness: TableHappiness;
   guestDetails: Map<string, GuestDetail>;
+  locked?: boolean;
+  onToggleLock?: () => void;
 }) {
   const color = tableColor(index);
   const toneColor = HAPPINESS_COLORS[happiness.tone];
@@ -93,7 +97,7 @@ function TableCircle({
   const tooltipDetail = tooltipState ? (guestDetails.get(tooltipState.guestId) ?? null) : null;
 
   return (
-    <div className="table-tile">
+    <div className={`table-tile ${locked ? "table-tile-locked" : ""}`}>
       <div className="table-tile-head">
         <span className="table-dot" style={{ background: color }} />
         <span className="table-tile-title">Table {index + 1}</span>
@@ -104,6 +108,18 @@ function TableCircle({
         >
           {happiness.label} · {happiness.score}
         </span>
+        {onToggleLock && (
+          <button
+            type="button"
+            className={`table-lock-btn ${locked ? "table-lock-btn-active" : ""}`}
+            onClick={onToggleLock}
+            title={locked ? "Unlock table" : "Lock table — keep it fixed across regenerations"}
+            aria-label={locked ? "Unlock table" : "Lock table"}
+            aria-pressed={locked}
+          >
+            {locked ? "🔒" : "🔓"}
+          </button>
+        )}
       </div>
 
       <svg
@@ -184,6 +200,7 @@ export function TablesView() {
   const taper = useAppStore((s) => s.config.taper);
   const fomo = useAppStore((s) => s.config.fomo);
   const worstCase = useAppStore((s) => s.config.worstCaseScore);
+  const toggleTableLock = useAppStore((s) => s.toggleTableLock);
 
   const nameOf = useMemo(() => {
     const map = new Map(guests.map((g) => [g.id, g.name] as const));
@@ -240,6 +257,8 @@ export function TablesView() {
             guestHappy={report.guest}
             happiness={report.table[i]}
             guestDetails={guestDetails ?? new Map()}
+            locked={t.locked}
+            onToggleLock={() => toggleTableLock(t.id)}
           />
         ))}
       </div>

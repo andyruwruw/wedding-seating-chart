@@ -9,6 +9,7 @@ import {
 import {
   connectionRows,
   guestRows,
+  lockedRows,
   seatingRows,
   SHEET_TAB_LIST,
   SHEET_TABS,
@@ -38,7 +39,7 @@ export async function pushAllToSheet(): Promise<void> {
   setGoogle({ status: "syncing", error: null });
 
   const doWrites = async (token: string) => {
-    const { guests: gs, connections: cs, result: rs, config } =
+    const { guests: gs, connections: cs, result: rs, config, lockedTables: lts } =
       useAppStore.getState();
     const lastSig = useAppStore.getState().google.lastSig;
     const appSig = snapshotSignature(gs, cs);
@@ -46,7 +47,8 @@ export async function pushAllToSheet(): Promise<void> {
     // If the sheet's editable data changed under us, adopt it instead.
     const gRows = await readTab(token, id, SHEET_TABS.guests).catch(() => []);
     const cRows = await readTab(token, id, SHEET_TABS.connections).catch(() => []);
-    const sheetSnap = snapshotFromTabs(gRows, cRows);
+    const lRows = await readTab(token, id, SHEET_TABS.locked).catch(() => []);
+    const sheetSnap = snapshotFromTabs(gRows, cRows, lRows);
     if (sheetSnap.guests.length > 0) {
       const sheetSig = snapshotSignature(sheetSnap.guests, sheetSnap.connections);
       if (sheetSig !== lastSig && sheetSig !== appSig) {
@@ -67,6 +69,9 @@ export async function pushAllToSheet(): Promise<void> {
       SHEET_TABS.seating,
       seatingRows(gs, cs, rs, config.taper, config.fomo, config.worstCaseScore),
     );
+    // Locked tables can change (lock/unlock a table) without touching guest
+    // names or connections, so this is written every push, not gated on appSig.
+    await writeTab(token, id, SHEET_TABS.locked, lockedRows(gs, lts));
     if (appSig !== lastSig) {
       await writeTab(token, id, SHEET_TABS.guests, guestRows(gs, cs, rs));
       await writeTab(token, id, SHEET_TABS.connections, connectionRows(gs, cs));

@@ -4,14 +4,14 @@ import type { NodeObject } from "react-force-graph-2d";
 import type { GraphSettings } from "../../types";
 import { KEEP_APART_VALUE } from "../form/config/relationship-tiers";
 import {
-  GRAPH_BACKGROUND,
-  LABEL_COLOR,
+  graphBackground,
+  labelColor,
   LABEL_FONT,
-  NODE_GLOW,
   NODE_RADIUS,
   NODE_SELECTED_COLOR,
 } from "./config";
 import { linkStyle } from "./helpers";
+import { useThemeStore } from "../../store/use-theme-store";
 
 export interface GraphNode {
   id: string;
@@ -121,6 +121,7 @@ export function ForceGraph({
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceHandle | undefined>(undefined);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const dark = useThemeStore((s) => s.theme === "dark");
 
   // Live-updated gravity strength + a stable force instance registered once.
   const gravityStrength = useRef(settings.centerForce);
@@ -222,7 +223,7 @@ export function ForceGraph({
           width={size.width}
           height={size.height}
           graphData={graphData}
-          backgroundColor={GRAPH_BACKGROUND}
+          backgroundColor={graphBackground(dark)}
           cooldownTicks={120}
           d3VelocityDecay={0.3}
           linkColor={(l) => linkStyle((l as GraphLink).value).color}
@@ -245,14 +246,10 @@ export function ForceGraph({
             const selected = n.id === selectedId;
             const r = selected ? NODE_RADIUS * 1.25 : NODE_RADIUS;
 
-            // Glow / bloom.
-            ctx.shadowColor = n.color;
-            ctx.shadowBlur = selected ? NODE_GLOW * 1.6 : NODE_GLOW;
             ctx.beginPath();
             ctx.arc(x, y, r, 0, 2 * Math.PI);
             ctx.fillStyle = selected ? NODE_SELECTED_COLOR : n.color;
             ctx.fill();
-            ctx.shadowBlur = 0;
 
             // Selection ring.
             if (selected) {
@@ -268,7 +265,7 @@ export function ForceGraph({
               ctx.font = LABEL_FONT;
               ctx.textAlign = "center";
               ctx.textBaseline = "top";
-              ctx.fillStyle = LABEL_COLOR;
+              ctx.fillStyle = labelColor(dark);
               ctx.fillText(n.name, x, y + r + 1.5);
             }
           }}

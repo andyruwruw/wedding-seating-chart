@@ -1,4 +1,4 @@
-import type { Connection, Guest, SeatingResult } from "../../../types";
+import type { Connection, Guest, SeatingResult, SeatingTable } from "../../../types";
 import type { CellValue } from "../../../lib/google/sheets";
 import { computeHappiness, makeMultLookup } from "./happiness";
 
@@ -7,12 +7,14 @@ export const SHEET_TABS = {
   seating: "Seating",
   guests: "Guests",
   connections: "Connections",
+  locked: "Locked",
 } as const;
 
 export const SHEET_TAB_LIST = [
   SHEET_TABS.seating,
   SHEET_TABS.guests,
   SHEET_TABS.connections,
+  SHEET_TABS.locked,
 ];
 
 function nameLookup(guests: Guest[]): (id: string) => string {
@@ -49,6 +51,24 @@ export function connectionRows(
   for (const c of connections) {
     rows.push([nameOf(c.source), nameOf(c.target), c.label, c.value]);
   }
+  return rows;
+}
+
+/**
+ * One row per (locked table, guest) pair. Locked tables are name-based, like
+ * the Guests/Connections tabs, so they survive an id-regenerating re-import.
+ */
+export function lockedRows(
+  guests: Guest[],
+  lockedTables: SeatingTable[],
+): CellValue[][] {
+  const nameOf = nameLookup(guests);
+  const rows: CellValue[][] = [["Locked Table", "Guest"]];
+  lockedTables.forEach((lt, i) => {
+    for (const id of lt.guestIds) {
+      rows.push([`Locked ${i + 1}`, nameOf(id)]);
+    }
+  });
   return rows;
 }
 

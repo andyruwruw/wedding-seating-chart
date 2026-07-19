@@ -68,12 +68,8 @@ export function SeatingChart() {
         <div className="left-body">
           {navTab === "guests" && <GuestPanel />}
           {navTab === "connections" && <ConnectionEditor />}
-          {navTab === "seating" && (
-            <>
-              <SeatingPanel />
-              <GoogleSyncPanel />
-            </>
-          )}
+          {navTab === "seating" && <SeatingPanel />}
+          {navTab === "google" && <GoogleSyncPanel />}
         </div>
       </aside>
     </div>

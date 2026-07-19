@@ -31,10 +31,12 @@ export function SeatingPanel() {
   const connections = useAppStore((s) => s.connections);
   const config = useAppStore((s) => s.config);
   const result = useAppStore((s) => s.result);
+  const lockedTables = useAppStore((s) => s.lockedTables);
   const isGenerating = useAppStore((s) => s.isGenerating);
   const setConfig = useAppStore((s) => s.setConfig);
   const generate = useAppStore((s) => s.generate);
   const regenerate = useAppStore((s) => s.regenerate);
+  const toggleTableLock = useAppStore((s) => s.toggleTableLock);
 
   const nameOf = (id: string) => guests.find((g) => g.id === id)?.name ?? "?";
   const canGenerate = guests.length > 0;
@@ -219,6 +221,13 @@ export function SeatingPanel() {
         </p>
       )}
 
+      {lockedTables.length > 0 && (
+        <p className="plan-readout">
+          🔒 {lockedTables.length} table{lockedTables.length === 1 ? "" : "s"} locked
+          — kept exactly as-is on every regeneration.
+        </p>
+      )}
+
       <div className="generate-row">
         <Button
           variant="primary"
@@ -286,6 +295,8 @@ export function SeatingPanel() {
               guestDetails={guestDetails}
               alignmentSummary={alignmentSummaries?.[i] ?? null}
               showHarmony={config.alignmentWeight > 0}
+              locked={t.locked}
+              onToggleLock={() => toggleTableLock(t.id)}
             />
           ))}
         </div>

@@ -56,7 +56,8 @@ export function GoogleSyncPanel() {
     try {
       const gRows = await readTab(token, id, SHEET_TABS.guests);
       const cRows = await readTab(token, id, SHEET_TABS.connections);
-      const snap = snapshotFromTabs(gRows, cRows);
+      const lRows = await readTab(token, id, SHEET_TABS.locked).catch(() => []);
+      const snap = snapshotFromTabs(gRows, cRows, lRows);
       if (snap.guests.length === 0) return;
       const sheetSig = snapshotSignature(snap.guests, snap.connections);
       if (sheetSig !== lastSig) {
@@ -133,12 +134,13 @@ export function GoogleSyncPanel() {
       ) {
         const gRows = await readTab(token, id, SHEET_TABS.guests);
         const cRows = await readTab(token, id, SHEET_TABS.connections);
+        const lRows = await readTab(token, id, SHEET_TABS.locked).catch(() => []);
         // Trust it only if the headers match what we write.
         const ours =
           (gRows[0]?.[0] ?? "").trim().toLowerCase() === "name" ||
           (cRows[0]?.[0] ?? "").trim().toLowerCase() === "source";
         if (ours) {
-          const snapshot = snapshotFromTabs(gRows, cRows);
+          const snapshot = snapshotFromTabs(gRows, cRows, lRows);
           if (snapshot.guests.length > 0) {
             loadSnapshot(snapshot, false);
             setGoogle({

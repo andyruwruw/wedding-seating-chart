@@ -1,4 +1,10 @@
-import type { Connection, DndAlignment, Guest, ProjectSnapshot } from "../../../types";
+import type {
+  Connection,
+  DndAlignment,
+  Guest,
+  ProjectSnapshot,
+  SeatingTable,
+} from "../../../types";
 import { resolveTier } from "../../../components/form/config/relationship-tiers";
 import { pairKey } from "../../../store/use-app-store";
 
@@ -56,6 +62,7 @@ const cell = (row: string[] | undefined, i: number) => (row?.[i] ?? "").trim();
 export function snapshotFromTabs(
   guestRows: string[][],
   connectionRows: string[][],
+  lockedRows: string[][] = [],
 ): ProjectSnapshot {
   const idByName = new Map<string, string>();
   const guests: Guest[] = [];
@@ -115,5 +122,28 @@ export function snapshotFromTabs(
     });
   }
 
-  return { guests, connections };
+  // Locked tab — column A: lock group label, column B: guest name. Guests
+  // referenced here but absent from the Guests/Connections tabs are created
+  // too, so a lock never silently loses a member.
+  const groups = new Map<string, string[]>();
+  const order: string[] = [];
+  let li =
+    lockedRows[0] && cell(lockedRows[0], 0).toLowerCase() === "locked table" ? 1 : 0;
+  for (; li < lockedRows.length; li++) {
+    const label = cell(lockedRows[li], 0);
+    const name = cell(lockedRows[li], 1);
+    if (!label || !name) continue;
+    const id = ensureGuest(name);
+    if (!groups.has(label)) order.push(label);
+    const members = groups.get(label) ?? [];
+    members.push(id);
+    groups.set(label, members);
+  }
+  const lockedTables: SeatingTable[] = order.map((label) => ({
+    id: `lock-${label}`,
+    guestIds: groups.get(label)!,
+    locked: true,
+  }));
+
+  return { guests, connections, lockedTables };
 }

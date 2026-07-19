@@ -130,33 +130,40 @@ function buildUnits(ids: string[], connections: Connection[]): string[][] {
   return [...groups.values()];
 }
 
+interface CoreResult {
+  tables: SeatingTable[];
+  score: number;
+  violations: string[];
+}
+
 /**
- * Best-effort seating optimiser.
+ * Best-effort seating optimiser over a fixed guest list and explicit table
+ * capacities. Objective: maximise the sum of every guest's *felt happiness* —
+ * how much of their world is at their table, minus how left-out they feel
+ * from the biggest gathering of their people happening elsewhere (weighted by
+ * `fomo`). Keep-apart is a hard penalty; keep-together pairs (couples) move
+ * as one unit.
  *
- * Objective: maximise the sum of every guest's *felt happiness* — how much of
- * their world is at their table, minus how left-out they feel from the biggest
- * gathering of their people happening elsewhere (weighted by `fomo`). Keep-apart
- * is a hard penalty; keep-together pairs (couples) move as one unit.
- *
- * Method: an affinity-greedy seed, then hill-climbing swaps of equal-sized units
- * between tables, evaluated incrementally (only the people whose social picture
- * changed are re-scored), keeping any swap that raises the total.
+ * Method: an affinity-greedy seed, then hill-climbing swaps of equal-sized
+ * units between tables, evaluated incrementally (only the people whose
+ * social picture changed are re-scored), keeping any swap that raises the
+ * total.
  */
-export function solveSeating(
+function solveCore(
   guests: Guest[],
   connections: Connection[],
+  capacities: number[],
   config: SeatingConfig,
   seed: number,
-): SeatingResult {
+): CoreResult {
   const rng = mulberry32(seed);
   const ids = guests.map((g) => g.id);
   const n = ids.length;
-  if (n === 0) return { tables: [], score: 0, violations: [], seed };
+  if (n === 0) return { tables: [], score: 0, violations: [] };
 
   const { taper, fomo: globalFomo, cohesion, alignmentWeight, worstBehavior } = config;
   const multOf = makeMultLookup(guests);
   const aff = buildAffinities(connections, taper);
-  const capacities = computeCapacities(n, config);
   const tableCount = capacities.length;
 
   // --- Per-guest social graph (positive friends + conflict partners).
@@ -477,5 +484,94 @@ export function solveSeating(
     guestIds,
   }));
 
-  return { tables: resultTables, score: Math.round(score), violations, seed };
+  return { tables: resultTables, score: Math.round(score), violations };
+}
+
+/**
+ * Public entry point. `lockedTables` are guest groups that must be seated
+ * together, unchanged, no matter how the rest of the party is arranged —
+ * they're carved out before solving and stitched back in afterward, so
+ * regeneration never touches them. Everyone else is solved as usual across
+ * however many tables remain, sized so the party's overall table count still
+ * roughly matches what the config would produce without any locks.
+ */
+export function solveSeating(
+  guests: Guest[],
+  connections: Connection[],
+  config: SeatingConfig,
+  seed: number,
+  lockedTables: SeatingTable[] = [],
+): SeatingResult {
+  const n = guests.length;
+  if (n === 0) return { tables: [], score: 0, violations: [], seed };
+
+  const validIds = new Set(guests.map((g) => g.id));
+  const locks = lockedTables
+    .map((lt) => ({ ...lt, guestIds: lt.guestIds.filter((id) => validIds.has(id)) }))
+    .filter((lt) => lt.guestIds.length > 0);
+
+  if (locks.length === 0) {
+    const { tables, score, violations } = solveCore(
+      guests,
+      connections,
+      computeCapacities(n, config),
+      config,
+      seed,
+    );
+    return { tables, score, violations, seed };
+  }
+
+  const lockedGuestIds = new Set(locks.flatMap((lt) => lt.guestIds));
+  const freeGuests = guests.filter((g) => !lockedGuestIds.has(g.id));
+  const freeConnections = connections.filter(
+    (c) => !lockedGuestIds.has(c.source) && !lockedGuestIds.has(c.target),
+  );
+
+  // Aim for roughly the same total table count the config would produce for
+  // everyone, then subtract the locked tables to size the free-guest solve —
+  // growing past that if the free guests wouldn't otherwise fit.
+  const baseTableCount = computeCapacities(n, config).length;
+  const seats = Math.max(1, Math.floor(config.seatsPerTable));
+  const neededFreeTables =
+    freeGuests.length === 0 ? 0 : Math.max(1, Math.ceil(freeGuests.length / seats));
+  const freeTableCount = Math.max(baseTableCount - locks.length, neededFreeTables);
+
+  const freeCapacities =
+    freeGuests.length === 0
+      ? []
+      : computeCapacities(freeGuests.length, {
+          ...config,
+          autoTables: false,
+          tableCount: freeTableCount,
+        });
+
+  const free: CoreResult =
+    freeGuests.length === 0
+      ? { tables: [], score: 0, violations: [] }
+      : solveCore(freeGuests, freeConnections, freeCapacities, config, seed);
+
+  // Locked tables keep their exact membership; still flag any "must not sit
+  // together" pairs a lock has forced together, so the warning surfaces.
+  const aff = buildAffinities(connections, config.taper);
+  const nameOf = new Map(guests.map((g) => [g.id, g.name] as const));
+  const lockViolations: string[] = [];
+  const lockedOut: SeatingTable[] = locks.map((lt) => {
+    for (let i = 0; i < lt.guestIds.length; i++) {
+      for (let j = i + 1; j < lt.guestIds.length; j++) {
+        if (aff.conflict(lt.guestIds[i], lt.guestIds[j])) {
+          lockViolations.push(
+            `${nameOf.get(lt.guestIds[i])} and ${nameOf.get(lt.guestIds[j])} are seated together but marked "must not sit together" (locked table).`,
+          );
+        }
+      }
+    }
+    return { id: lt.id, guestIds: lt.guestIds, locked: true };
+  });
+
+  return {
+    tables: [...lockedOut, ...free.tables.map((t) => ({ ...t, locked: false }))],
+    score: Math.round(free.score),
+    violations: [...lockViolations, ...free.violations],
+    seed,
+  };
 }

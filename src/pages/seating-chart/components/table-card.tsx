@@ -19,6 +19,8 @@ interface TableCardProps {
   guestDetails?: Map<string, GuestDetail> | null;
   alignmentSummary?: TableAlignmentSummary | null;
   showHarmony?: boolean;
+  locked?: boolean;
+  onToggleLock?: () => void;
 }
 
 export function TableCard({
@@ -29,6 +31,8 @@ export function TableCard({
   guestDetails,
   alignmentSummary,
   showHarmony = false,
+  locked = false,
+  onToggleLock,
 }: TableCardProps) {
   const toneColor = HAPPINESS_COLORS[happiness.tone];
 
@@ -68,7 +72,10 @@ export function TableCard({
   const tooltipDetail = tooltipState ? guestDetails?.get(tooltipState.guestId) : null;
 
   return (
-    <div className="table-card" style={{ borderLeftColor: color }}>
+    <div
+      className={`table-card ${locked ? "table-card-locked" : ""}`}
+      style={{ borderLeftColor: locked ? "var(--accent)" : color }}
+    >
       <div className="table-card-head">
         <span className="table-dot" style={{ background: color }} />
         <span className="table-card-title">Table {index + 1}</span>
@@ -79,6 +86,18 @@ export function TableCard({
           {happiness.label} · {happiness.score}
         </span>
         <span className="table-card-count">{guests.length}</span>
+        {onToggleLock && (
+          <button
+            type="button"
+            className={`table-lock-btn ${locked ? "table-lock-btn-active" : ""}`}
+            onClick={onToggleLock}
+            title={locked ? "Unlock table" : "Lock table — keep it fixed across regenerations"}
+            aria-label={locked ? "Unlock table" : "Lock table"}
+            aria-pressed={locked}
+          >
+            {locked ? "🔒" : "🔓"}
+          </button>
+        )}
       </div>
 
       <div className="table-card-guests">
