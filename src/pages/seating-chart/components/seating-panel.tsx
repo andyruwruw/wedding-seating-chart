@@ -14,7 +14,6 @@ import {
   computeGuestDetails,
   HAPPINESS_COLORS,
   makeMultLookup,
-  type GuestDetail,
 } from "../helpers/happiness";
 import { tableAlignmentSummary } from "../helpers/alignment";
 import { pairKey } from "../../../store/use-app-store";
