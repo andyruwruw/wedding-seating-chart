@@ -25,3 +25,13 @@ export const CONFLICT_COLOR = "rgba(217, 49, 74, 0.9)";
 
 /** "Might get along" hints render in this soft color, dashed. */
 export const TENTATIVE_COLOR = "rgba(15, 157, 122, 0.75)";
+
+/**
+ * Glossy node highlight — a small light dot offset toward the upper-left of
+ * every node, shared between the canvas-drawn force graph (see
+ * `drawNodeHighlight` in helpers) and the SVG `GraphNode` component so nodes
+ * look the same wherever they're rendered.
+ */
+export const NODE_HIGHLIGHT_OFFSET = 0.32;
+export const NODE_HIGHLIGHT_RADIUS_RATIO = 0.38;
+export const NODE_HIGHLIGHT_OPACITY = 0.4;

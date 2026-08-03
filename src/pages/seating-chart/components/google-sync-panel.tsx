@@ -18,6 +18,7 @@ import {
   readTab,
 } from "../../../lib/google/sheets";
 import { SHEET_TAB_LIST, SHEET_TABS } from "../helpers/sheet-export";
+import { CloseIcon } from "../../../components/icons";
 import { snapshotFromTabs, snapshotSignature } from "../helpers/sheet-import";
 import { pushAllToSheet } from "../helpers/google-sync";
 import {
@@ -325,7 +326,7 @@ export function GoogleSyncPanel() {
           </a>
 
           <Button small variant="ghost" block onClick={copyShareLink}>
-            {copied ? "Link copied ✓" : "Copy share link"}
+            {copied ? "Link copied" : "Copy share link"}
           </Button>
           <p className="empty-hint">
             Anyone you share the sheet with can open this link and sign in to see
@@ -359,7 +360,7 @@ export function GoogleSyncPanel() {
               {google.status === "syncing" ? "Syncing…" : "Sync now"}
             </Button>
             <Button onClick={detach} aria-label="Detach spreadsheet">
-              ✕
+              <CloseIcon size={13} />
             </Button>
           </div>
 

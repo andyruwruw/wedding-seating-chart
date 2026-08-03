@@ -4,6 +4,7 @@ import {
   TONE_LABEL,
   type GuestDetail,
 } from "../helpers/happiness";
+import { WarningIcon } from "../../../components/icons";
 
 interface GuestTooltipProps {
   name: string;
@@ -37,7 +38,7 @@ export function GuestTooltip({ name, detail, anchorRect }: GuestTooltipProps) {
       {hasConflicts && detail && (
         <div className="guest-tooltip-section">
           <span className="guest-tooltip-label guest-tooltip-conflict-label">
-            ⚠ Conflict at this table
+            <WarningIcon size={10} /> Conflict at this table
           </span>
           {detail.conflicts.map((c) => (
             <div key={c.name} className="guest-tooltip-row guest-tooltip-conflict-row">

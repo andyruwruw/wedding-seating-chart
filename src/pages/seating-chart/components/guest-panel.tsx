@@ -3,13 +3,13 @@ import { createPortal } from "react-dom";
 import { Panel } from "../../../components/layout/panel";
 import { Button } from "../../../components/form/button";
 import { useAppStore } from "../../../store/use-app-store";
-import { tableColor, fomoLevel, nextFomoMult } from "../config";
+import { tableColor, fomoLevel, nextFomoMult, FOMO_LEVELS } from "../config";
 import { ImportDialog } from "./import-dialog";
 import { ExportDialog } from "./export-dialog";
 import { makeSampleSnapshot } from "../helpers/sample-data";
-import { ALIGNMENT_INFO, nextAlignment } from "../helpers/alignment";
 import { pushAllToSheet } from "../helpers/google-sync";
 import { isConfigured } from "../../../lib/google/gis";
+import { CloseIcon, ExportIcon, FomoIcon, ImportIcon, SparkleIcon } from "../../../components/icons";
 
 export function GuestPanel() {
   const guests = useAppStore((s) => s.guests);
@@ -20,7 +20,6 @@ export function GuestPanel() {
   const removeGuest = useAppStore((s) => s.removeGuest);
   const selectGuest = useAppStore((s) => s.selectGuest);
   const setGuestFomo = useAppStore((s) => s.setGuestFomo);
-  const setGuestAlignment = useAppStore((s) => s.setGuestAlignment);
   const clearAll = useAppStore((s) => s.clearAll);
   const loadSnapshot = useAppStore((s) => s.loadSnapshot);
   const google = useAppStore((s) => s.google);
@@ -240,7 +239,7 @@ export function GuestPanel() {
             </p>
             <p className="empty-hint">Or start from a ready-made example:</p>
             <Button variant="primary" block onClick={loadSample}>
-              ✨ Load sample data
+              <SparkleIcon /> Load sample data
             </Button>
           </div>
         )}
@@ -269,29 +268,7 @@ export function GuestPanel() {
                   setGuestFomo(g.id, nextFomoMult(g.fomo));
                 }}
               >
-                {fomoLevel(g.fomo).emoji}
-              </button>
-              <button
-                className="fomo-chip alignment-chip"
-                title={
-                  g.alignment
-                    ? `D&D: ${ALIGNMENT_INFO[g.alignment].label} — click to change`
-                    : "D&D alignment: unset — click to assign"
-                }
-                style={
-                  g.alignment
-                    ? {
-                        color: ALIGNMENT_INFO[g.alignment].color,
-                        background: `${ALIGNMENT_INFO[g.alignment].color}22`,
-                      }
-                    : undefined
-                }
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setGuestAlignment(g.id, nextAlignment(g.alignment));
-                }}
-              >
-                {g.alignment ?? "·"}
+                <FomoIcon level={FOMO_LEVELS.indexOf(fomoLevel(g.fomo))} />
               </button>
               <span className="guest-meta">{connectionCount(g.id)}</span>
               <Button
@@ -303,7 +280,7 @@ export function GuestPanel() {
                 }}
                 aria-label={`Remove ${g.name}`}
               >
-                ✕
+                <CloseIcon size={11} />
               </Button>
             </div>
           );
@@ -312,17 +289,17 @@ export function GuestPanel() {
 
       <div className="io-row">
         <Button small onClick={() => setDialog("import")}>
-          ⬆ Import
+          <ImportIcon /> Import
         </Button>
         <Button
           small
           onClick={() => setDialog("export")}
           disabled={guests.length === 0}
         >
-          ⬇ Export
+          <ExportIcon /> Export
         </Button>
         <Button small onClick={loadSample}>
-          ✨ Sample
+          <SparkleIcon /> Sample
         </Button>
       </div>
 

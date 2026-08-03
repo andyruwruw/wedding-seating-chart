@@ -3,7 +3,13 @@ import {
   MAX_TIER,
   TENTATIVE_VALUES,
 } from "../../form/config/relationship-tiers";
-import { CONFLICT_COLOR, TENTATIVE_COLOR } from "../config";
+import {
+  CONFLICT_COLOR,
+  NODE_HIGHLIGHT_OFFSET,
+  NODE_HIGHLIGHT_OPACITY,
+  NODE_HIGHLIGHT_RADIUS_RATIO,
+  TENTATIVE_COLOR,
+} from "../config";
 
 export interface LinkStyle {
   color: string;
@@ -33,4 +39,30 @@ export function linkStyle(value: number): LinkStyle {
     130 + t * -6,
   )}, ${Math.round(170 + t * 85)}, ${alpha.toFixed(3)})`;
   return { color, width, dashed: false };
+}
+
+/**
+ * Draws the glossy highlight dot every graph node gets, offset toward the
+ * upper-left. Shared with the SVG `GraphNode` component so canvas- and
+ * SVG-rendered nodes share the same look.
+ */
+export function drawNodeHighlight(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = NODE_HIGHLIGHT_OPACITY;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(
+    x - r * NODE_HIGHLIGHT_OFFSET,
+    y - r * NODE_HIGHLIGHT_OFFSET,
+    r * NODE_HIGHLIGHT_RADIUS_RATIO,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+  ctx.restore();
 }

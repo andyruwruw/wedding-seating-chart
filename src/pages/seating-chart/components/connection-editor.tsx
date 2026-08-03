@@ -12,8 +12,9 @@ import {
 } from "../../../components/form/config/relationship-tiers";
 import { TIER_OPTIONS } from "../config";
 import { ALIGNMENT_INFO } from "../helpers/alignment";
+import { AlignmentDialog } from "./alignment-dialog";
 import { GroupConnect } from "./group-connect";
-import type { DndAlignment } from "../../../types";
+import { CloseIcon } from "../../../components/icons";
 
 const DEFAULT_TIER_INDEX = Math.max(
   0,
@@ -25,30 +26,36 @@ function indexForLabel(label: string): number {
   return i >= 0 ? i : DEFAULT_TIER_INDEX;
 }
 
-type ConnTab = "connected" | "friends" | "alignment" | "groups";
+type ConnTab = "connected" | "friends" | "groups";
 
-const LAW_LABELS = ["Lawful", "Neutral", "Chaotic"];
-const MORAL_LABELS = ["Good", "Neutral", "Evil"];
+interface ConnectionEditorProps {
+  onBack: () => void;
+}
 
-const GRID: DndAlignment[][] = [
-  ["LG", "NG", "CG"],
-  ["LN", "TN", "CN"],
-  ["LE", "NE", "CE"],
-];
-
-export function ConnectionEditor() {
+export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
   const guests = useAppStore((s) => s.guests);
   const connections = useAppStore((s) => s.connections);
   const selectedGuestId = useAppStore((s) => s.selectedGuestId);
   const setConnection = useAppStore((s) => s.setConnection);
   const removeConnection = useAppStore((s) => s.removeConnection);
-  const setGuestAlignment = useAppStore((s) => s.setGuestAlignment);
   const setGraphColorMode = useAppStore((s) => s.setGraphColorMode);
 
   const [activeTab, setActiveTab] = useState<ConnTab>("connected");
   const [targetId, setTargetId] = useState("");
   const [tierIndex, setTierIndex] = useState(DEFAULT_TIER_INDEX);
+  const [alignmentOpen, setAlignmentOpen] = useState(false);
   const addComboRef = useRef<HTMLDivElement>(null);
+
+  // A plain vertical mouse wheel over a horizontally-scrolling strip
+  // otherwise just scrolls the panel behind it — redirect that delta into
+  // the tab strip's own horizontal scroll instead.
+  const handleTabsWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return;
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    el.scrollLeft += e.deltaY;
+    e.preventDefault();
+  };
 
   const selected = guests.find((g) => g.id === selectedGuestId) ?? null;
   const others = useMemo(
@@ -57,10 +64,7 @@ export function ConnectionEditor() {
   );
   const nameOf = (id: string) => guests.find((g) => g.id === id)?.name ?? "?";
 
-  const switchTab = (tab: ConnTab) => {
-    setActiveTab(tab);
-    setGraphColorMode(tab === "alignment" ? "alignment" : "table");
-  };
+  const switchTab = (tab: ConnTab) => setActiveTab(tab);
 
   useEffect(() => {
     setActiveTab("connected");
@@ -135,9 +139,34 @@ export function ConnectionEditor() {
   };
 
   return (
-    <Panel title={selected ? selected.name : "Connections"} subtitle="Connections" grow>
+    <Panel
+      title={selected ? selected.name : "Connections"}
+      subtitle="Connections"
+      grow
+      onBack={onBack}
+      actions={
+        selected && (
+          <button
+            type="button"
+            className="alignment-trigger"
+            onClick={() => setAlignmentOpen(true)}
+            title="Set D&D alignment — colors the graph"
+            style={
+              selected.alignment
+                ? {
+                    color: ALIGNMENT_INFO[selected.alignment].color,
+                    borderColor: `${ALIGNMENT_INFO[selected.alignment].color}66`,
+                  }
+                : undefined
+            }
+          >
+            {selected.alignment ?? "Alignment"}
+          </button>
+        )
+      }
+    >
       {/* ── Tab bar ── */}
-      <div className="conn-tabs">
+      <div className="conn-tabs" onWheel={handleTabsWheel}>
         <button
           className={`conn-tab${activeTab === "connected" ? " conn-tab-active" : ""}`}
           onClick={() => switchTab("connected")}
@@ -157,24 +186,6 @@ export function ConnectionEditor() {
           )}
         </button>
         <button
-          className={`conn-tab${activeTab === "alignment" ? " conn-tab-active" : ""}`}
-          onClick={() => switchTab("alignment")}
-          title="Set D&D alignment — colors the graph"
-        >
-          Alignment
-          {selected?.alignment && (
-            <span
-              className="conn-tab-count"
-              style={{
-                background: `${ALIGNMENT_INFO[selected.alignment].color}33`,
-                color: ALIGNMENT_INFO[selected.alignment].color,
-              }}
-            >
-              {selected.alignment}
-            </span>
-          )}
-        </button>
-        <button
           className={`conn-tab${activeTab === "groups" ? " conn-tab-active" : ""}`}
           onClick={() => switchTab("groups")}
           title="Connect many guests at once"
@@ -182,6 +193,15 @@ export function ConnectionEditor() {
           Groups
         </button>
       </div>
+
+      {selected && alignmentOpen && (
+        <AlignmentDialog
+          guestId={selected.id}
+          guestName={selected.name}
+          alignment={selected.alignment}
+          onClose={() => setAlignmentOpen(false)}
+        />
+      )}
 
       {/* ── Tab: Connected ── */}
       {activeTab === "connected" && (
@@ -205,7 +225,7 @@ export function ConnectionEditor() {
                       onClick={() => removeConnection(selected.id, otherId)}
                       aria-label={`Remove connection to ${nameOf(otherId)}`}
                     >
-                      ✕
+                      <CloseIcon size={11} />
                     </Button>
                   </div>
                   <Select
@@ -275,77 +295,6 @@ export function ConnectionEditor() {
                 <span className="chip-count">{mutuals}</span>
               </button>
             ))}
-          </div>
-        )
-      )}
-
-      {/* ── Tab: Alignment ── */}
-      {activeTab === "alignment" && (
-        !selected ? (
-          <p className="empty-hint">
-            Select a guest in the Guests tab to set their alignment.
-          </p>
-        ) : (
-          <div className="alignment-tab">
-            <p className="alignment-tab-hint">
-              Pick {selected.name}'s D&D alignment. The graph is now colored by alignment.
-            </p>
-
-            <div className="alignment-grid-wrap">
-              <div />
-              {LAW_LABELS.map((l) => (
-                <span key={l} className="alignment-axis-label">{l}</span>
-              ))}
-              {GRID.map((row, ri) => (
-                <>
-                  <span key={`row-${ri}`} className="alignment-axis-label alignment-axis-row">
-                    {MORAL_LABELS[ri]}
-                  </span>
-                  {row.map((al) => {
-                    const info = ALIGNMENT_INFO[al];
-                    const isActive = selected.alignment === al;
-                    return (
-                      <button
-                        key={al}
-                        className={`alignment-cell${isActive ? " alignment-cell-active" : ""}`}
-                        style={{ "--al-color": info.color } as React.CSSProperties}
-                        onClick={() =>
-                          setGuestAlignment(selected.id, isActive ? undefined : al)
-                        }
-                        title={info.label}
-                      >
-                        <span className="alignment-cell-code">{al}</span>
-                        <span className="alignment-cell-name">
-                          {info.label.split(" ").slice(1).join(" ")}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </>
-              ))}
-            </div>
-
-            {selected.alignment ? (
-              <div className="alignment-current">
-                <span
-                  className="alignment-current-badge"
-                  style={{
-                    color: ALIGNMENT_INFO[selected.alignment].color,
-                    borderColor: `${ALIGNMENT_INFO[selected.alignment].color}66`,
-                  }}
-                >
-                  {selected.alignment} · {ALIGNMENT_INFO[selected.alignment].label}
-                </span>
-                <button
-                  className="alignment-clear"
-                  onClick={() => setGuestAlignment(selected.id, undefined)}
-                >
-                  Clear
-                </button>
-              </div>
-            ) : (
-              <p className="empty-hint" style={{ textAlign: "center" }}>No alignment set</p>
-            )}
           </div>
         )
       )}

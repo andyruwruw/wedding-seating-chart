@@ -18,6 +18,7 @@ import {
 import { tableAlignmentSummary } from "../helpers/alignment";
 import { pairKey } from "../../../store/use-app-store";
 import { TableCard } from "./table-card";
+import { LockIcon, SwapIcon } from "../../../components/icons";
 
 const EFFORT_OPTIONS = [
   { label: "Quick", value: "quick" },
@@ -198,7 +199,7 @@ export function SeatingPanel() {
         tabIndex={0}
         onKeyDown={(e) => e.key === " " && setConfig({ worstBehavior: !config.worstBehavior })}
       >
-        <span className="worst-toggle-icon">{config.worstBehavior ? "💀" : "☠️"}</span>
+        <span className="worst-toggle-icon"><SwapIcon size={18} /></span>
         <span className="worst-toggle-text">
           <strong>Worst possible seating</strong>
           <span className="worst-toggle-hint">
@@ -221,8 +222,9 @@ export function SeatingPanel() {
       )}
 
       {lockedTables.length > 0 && (
-        <p className="plan-readout">
-          🔒 {lockedTables.length} table{lockedTables.length === 1 ? "" : "s"} locked
+        <p className="plan-readout plan-readout-icon">
+          <LockIcon size={12} />
+          {lockedTables.length} table{lockedTables.length === 1 ? "" : "s"} locked
           — kept exactly as-is on every regeneration.
         </p>
       )}

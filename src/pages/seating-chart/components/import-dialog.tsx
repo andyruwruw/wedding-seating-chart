@@ -9,6 +9,7 @@ import {
   RELATIONSHIP_TIERS,
   KEEP_APART_VALUE,
 } from "../../../components/form/config/relationship-tiers";
+import { ExportIcon, ImportIcon } from "../../../components/icons";
 
 interface ImportDialogProps {
   onClose: () => void;
@@ -128,9 +129,9 @@ export function ImportDialog({ onClose }: ImportDialogProps) {
         </p>
 
         <div className="import-actions">
-          <Button onClick={downloadTemplate}>⬇ Download template</Button>
+          <Button onClick={downloadTemplate}><ExportIcon /> Download template</Button>
           <Button variant="primary" onClick={() => relInput.current?.click()}>
-            ⬆ Upload relationships
+            <ImportIcon /> Upload relationships
           </Button>
         </div>
       </section>
@@ -157,7 +158,7 @@ export function ImportDialog({ onClose }: ImportDialogProps) {
 
         <div className="import-actions">
           <Button onClick={() => namesInput.current?.click()}>
-            ⬆ Upload names file
+            <ImportIcon /> Upload names file
           </Button>
           <Button
             variant="primary"

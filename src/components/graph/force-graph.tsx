@@ -10,7 +10,7 @@ import {
   NODE_RADIUS,
   NODE_SELECTED_COLOR,
 } from "./config";
-import { linkStyle } from "./helpers";
+import { drawNodeHighlight, linkStyle } from "./helpers";
 import { useThemeStore } from "../../store/use-theme-store";
 
 export interface GraphNode {
@@ -250,6 +250,7 @@ export function ForceGraph({
             ctx.arc(x, y, r, 0, 2 * Math.PI);
             ctx.fillStyle = selected ? NODE_SELECTED_COLOR : n.color;
             ctx.fill();
+            drawNodeHighlight(ctx, x, y, r);
 
             // Selection ring.
             if (selected) {

@@ -10,6 +10,7 @@ import {
   type TableAlignmentSummary,
 } from "../helpers/alignment";
 import { GuestTooltip } from "./guest-tooltip";
+import { HarmonyIcon, LockIcon, UnlockIcon } from "../../../components/icons";
 
 interface TableCardProps {
   index: number;
@@ -95,7 +96,7 @@ export function TableCard({
             aria-label={locked ? "Unlock table" : "Lock table"}
             aria-pressed={locked}
           >
-            {locked ? "🔒" : "🔓"}
+            {locked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
           </button>
         )}
       </div>
@@ -136,7 +137,7 @@ export function TableCard({
               className="table-align-harmony"
               title="Average alignment compatibility between disconnected guests"
             >
-              ⚔ {harmony}%
+              <HarmonyIcon size={11} /> {harmony}%
             </span>
           )}
         </div>

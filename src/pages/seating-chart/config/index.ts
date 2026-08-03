@@ -44,9 +44,9 @@ export function tierWeightByIndex(index: number): number {
 
 /** Per-guest FOMO presets, cycled by a chip in the guest list. */
 export const FOMO_LEVELS = [
-  { label: "Chill", emoji: "😎", mult: 0.3 },
-  { label: "Normal", emoji: "🙂", mult: 1 },
-  { label: "Clingy", emoji: "🥺", mult: 2 },
+  { label: "Chill", mult: 0.3 },
+  { label: "Normal", mult: 1 },
+  { label: "Clingy", mult: 2 },
 ] as const;
 
 export function fomoLevel(mult = 1): (typeof FOMO_LEVELS)[number] {

@@ -32,46 +32,48 @@ export function SeatingChart() {
 
   return (
     <div className="seating-chart">
-      <div className="col col-nav">
-        <SidebarNav active={navTab} onChange={setNavTab} />
-      </div>
+      <SidebarNav active={navTab} onChange={setNavTab} />
 
-      <main className="col col-center">
-        {result && (
-          <div className="view-tabs">
-            <button
-              className={`view-tab ${view === "graph" ? "view-tab-active" : ""}`}
-              onClick={() => setView("graph")}
-            >
-              Graph
-            </button>
-            <button
-              className={`view-tab ${view === "tables" ? "view-tab-active" : ""}`}
-              onClick={() => setView("tables")}
-            >
-              Tables
-            </button>
-          </div>
-        )}
-        <div className="view-body">
-          {view === "tables" && result ? <TablesView /> : <GraphView />}
-          {isGenerating && (
-            <div className="generating-overlay">
-              <div className="spinner" />
-              <span>Generating seating…</span>
+      <div className="seating-chart-body">
+        <main className="col col-center">
+          {result && (
+            <div className="view-tabs">
+              <button
+                className={`view-tab ${view === "graph" ? "view-tab-active" : ""}`}
+                onClick={() => setView("graph")}
+              >
+                Graph
+              </button>
+              <button
+                className={`view-tab ${view === "tables" ? "view-tab-active" : ""}`}
+                onClick={() => setView("tables")}
+              >
+                Tables
+              </button>
             </div>
           )}
-        </div>
-      </main>
+          <div className="view-body">
+            {view === "tables" && result ? <TablesView /> : <GraphView />}
+            {isGenerating && (
+              <div className="generating-overlay">
+                <div className="spinner" />
+                <span>Generating seating…</span>
+              </div>
+            )}
+          </div>
+        </main>
 
-      <aside className="col col-left">
-        <div className="left-body">
-          {navTab === "guests" && <GuestPanel />}
-          {navTab === "connections" && <ConnectionEditor />}
-          {navTab === "seating" && <SeatingPanel />}
-          {navTab === "google" && <GoogleSyncPanel />}
-        </div>
-      </aside>
+        <aside className="col col-left">
+          <div className="left-body">
+            {navTab === "guests" && <GuestPanel />}
+            {navTab === "connections" && (
+              <ConnectionEditor onBack={() => setNavTab("guests")} />
+            )}
+            {navTab === "seating" && <SeatingPanel />}
+            {navTab === "google" && <GoogleSyncPanel />}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

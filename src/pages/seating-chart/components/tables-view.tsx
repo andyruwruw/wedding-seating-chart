@@ -13,6 +13,7 @@ import {
 } from "../helpers/happiness";
 import type { Connection } from "../../../types";
 import { GuestTooltip } from "./guest-tooltip";
+import { LockIcon, UnlockIcon } from "../../../components/icons";
 
 const SIZE = 272;
 const CX = SIZE / 2;
@@ -117,7 +118,7 @@ function TableCircle({
             aria-label={locked ? "Unlock table" : "Lock table"}
             aria-pressed={locked}
           >
-            {locked ? "🔒" : "🔓"}
+            {locked ? <LockIcon size={12} /> : <UnlockIcon size={12} />}
           </button>
         )}
       </div>
@@ -230,37 +231,41 @@ export function TablesView() {
 
   return (
     <div className="tables-pane">
-      <div className="tables-legend">
-        <span className="section-label">Hover a name to see why</span>
-        <span className="tl-key">
-          <i className="tl-dot" style={{ background: HAPPINESS_COLORS.great }} />
-          happy
-        </span>
-        <span className="tl-key">
-          <i className="tl-dot" style={{ background: HAPPINESS_COLORS.ok }} />
-          mixed
-        </span>
-        <span className="tl-key">
-          <i className="tl-dot" style={{ background: HAPPINESS_COLORS.bad }} />
-          unhappy
-        </span>
-      </div>
+      <div className="tables-scroll">
+        <div className="tables-content">
+          <div className="tables-legend">
+            <span className="section-label">Hover a name to see why</span>
+            <span className="tl-key">
+              <i className="tl-dot" style={{ background: HAPPINESS_COLORS.great }} />
+              happy
+            </span>
+            <span className="tl-key">
+              <i className="tl-dot" style={{ background: HAPPINESS_COLORS.ok }} />
+              mixed
+            </span>
+            <span className="tl-key">
+              <i className="tl-dot" style={{ background: HAPPINESS_COLORS.bad }} />
+              unhappy
+            </span>
+          </div>
 
-      <div className="tables-grid">
-        {result.tables.map((t, i) => (
-          <TableCircle
-            key={t.id}
-            index={i}
-            guestIds={t.guestIds}
-            nameOf={nameOf}
-            connections={connections}
-            guestHappy={report.guest}
-            happiness={report.table[i]}
-            guestDetails={guestDetails ?? new Map()}
-            locked={t.locked}
-            onToggleLock={() => toggleTableLock(t.id)}
-          />
-        ))}
+          <div className="tables-grid">
+            {result.tables.map((t, i) => (
+              <TableCircle
+                key={t.id}
+                index={i}
+                guestIds={t.guestIds}
+                nameOf={nameOf}
+                connections={connections}
+                guestHappy={report.guest}
+                happiness={report.table[i]}
+                guestDetails={guestDetails ?? new Map()}
+                locked={t.locked}
+                onToggleLock={() => toggleTableLock(t.id)}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
