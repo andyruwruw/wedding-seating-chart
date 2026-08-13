@@ -18,7 +18,16 @@ import { LockIcon, UnlockIcon } from "../../../components/icons";
 const SIZE = 272;
 const CX = SIZE / 2;
 const CY = 130;
-const R = 82;
+const R = 74;
+const LABEL_R = R + 13;
+const AVG_CHAR_PX = 5.1;
+const LABEL_PAD = 4;
+
+function fitLabel(name: string, maxWidth: number): string {
+  const maxChars = Math.max(3, Math.floor(maxWidth / AVG_CHAR_PX));
+  if (name.length <= maxChars) return name;
+  return `${name.slice(0, maxChars - 1).trimEnd()}…`;
+}
 
 interface Seat {
   id: string;
@@ -152,8 +161,15 @@ function TableCircle({
 
         {seats.map((s) => {
           const anchor = s.cos > 0.3 ? "start" : s.cos < -0.3 ? "end" : "middle";
-          const lx = CX + (R + 13) * ((s.x - CX) / R);
-          const ly = CY + (R + 13) * ((s.y - CY) / R);
+          const lx = CX + LABEL_R * ((s.x - CX) / R);
+          const ly = CY + LABEL_R * ((s.y - CY) / R);
+          const maxWidth =
+            anchor === "start"
+              ? SIZE - lx - LABEL_PAD
+              : anchor === "end"
+                ? lx - LABEL_PAD
+                : 2 * Math.min(lx, SIZE - lx) - LABEL_PAD;
+          const label = fitLabel(s.name, maxWidth);
           return (
             <g
               key={s.id}
@@ -176,7 +192,7 @@ function TableCircle({
                 className="seat-name"
                 fill={s.color}
               >
-                {s.name}
+                {label}
               </text>
             </g>
           );

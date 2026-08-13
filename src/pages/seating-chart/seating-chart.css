@@ -451,16 +451,6 @@
   width: 100%;
 }
 
-.guest-search-dropdown {
-  min-width: 200px;
-}
-
-.guest-search-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .guest-list {
   display: flex;
   flex-direction: column;
@@ -941,6 +931,10 @@
 .table-card-locked {
   background: var(--accent-dim);
 }
+.table-card-locked .table-card-guests,
+.table-card-locked .table-alignment-row {
+  opacity: 0.55;
+}
 
 .table-lock-btn {
   display: flex;
@@ -990,7 +984,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
-  padding: 10px 12px;
+  padding: 14px 12px;
   pointer-events: none;
   font-size: 12px;
   line-height: 1.45;
@@ -1142,6 +1136,9 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
+.table-tile-locked .table-svg {
+  opacity: 0.55;
+}
 
 .table-tile-head {
   display: flex;
@@ -1165,7 +1162,7 @@
   width: 100%;
   height: auto;
   display: block;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .seat-name {

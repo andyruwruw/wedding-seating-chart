@@ -115,10 +115,10 @@ const DEFAULT_CONFIG: SeatingConfig = {
   autoTables: true,
   allowEmptySeats: true,
   effort: "balanced",
-  taper: 2,
-  fomo: 1,
+  taper: 1.5,
+  fomo: 2,
   worstCaseScore: false,
-  cohesion: 1,
+  cohesion: 2,
   alignmentWeight: 0,
   worstBehavior: false,
 };

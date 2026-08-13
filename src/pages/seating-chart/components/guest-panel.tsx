@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 import { Panel } from "../../../components/layout/panel";
 import { Button } from "../../../components/form/button";
 import { useAppStore } from "../../../store/use-app-store";
@@ -37,82 +36,11 @@ export function GuestPanel() {
   const [name, setName] = useState("");
   const [dialog, setDialog] = useState<"import" | "export" | null>(null);
 
-  // --- Search dropdown state ---
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
-  const formRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLUListElement>(null);
-
   const query = name.toLowerCase().trim();
-  const matches = useMemo(() => {
-    if (!query) return [];
+  const filteredGuests = useMemo(() => {
+    if (!query) return guests;
     return guests.filter((g) => g.name.toLowerCase().includes(query));
   }, [guests, query]);
-
-  const showDropdown = dropdownOpen && matches.length > 0;
-
-  const measure = () => {
-    if (formRef.current) {
-      const r = formRef.current.getBoundingClientRect();
-      setRect({ top: r.bottom + 4, left: r.left, width: r.width });
-    }
-  };
-
-  // Close dropdown on outside click.
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (formRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
-      setDropdownOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // Keep the dropdown anchored while open.
-  useEffect(() => {
-    if (!showDropdown) return;
-    const update = () => measure();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [showDropdown]);
-
-  const selectMatch = (id: string) => {
-    selectGuest(id);
-    setName("");
-    setDropdownOpen(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-    setHighlight(0);
-    measure();
-    setDropdownOpen(true);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (!showDropdown) { measure(); setDropdownOpen(true); }
-      else setHighlight((h) => Math.min(h + 1, matches.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlight((h) => Math.max(h - 1, 0));
-    } else if (e.key === "Enter") {
-      if (showDropdown && matches[highlight]) {
-        e.preventDefault();
-        selectMatch(matches[highlight].id);
-      }
-      // else: fall through to form onSubmit → add new guest
-    } else if (e.key === "Escape") {
-      setDropdownOpen(false);
-    }
-  };
 
   const submit = () => {
     if (addGuest(name)) setName("");
@@ -178,14 +106,12 @@ export function GuestPanel() {
           submit();
         }}
       >
-        <div className="add-guest-input-wrap" ref={formRef}>
+        <div className="add-guest-input-wrap">
           <input
             className="input"
-            placeholder="Add a guest…"
+            placeholder="Search or add"
             value={name}
-            onChange={handleInputChange}
-            onFocus={() => { if (matches.length > 0) { measure(); setDropdownOpen(true); } }}
-            onKeyDown={handleKeyDown}
+            onChange={(e) => setName(e.target.value)}
             autoComplete="off"
           />
         </div>
@@ -193,43 +119,6 @@ export function GuestPanel() {
           Add
         </Button>
       </form>
-
-      {showDropdown &&
-        rect &&
-        createPortal(
-          <ul
-            ref={dropdownRef}
-            className="combobox-list guest-search-dropdown"
-            style={{ position: "fixed", top: rect.top, left: rect.left, width: rect.width }}
-          >
-            {matches.map((g, i) => {
-              const tableIdx = tableOfGuest.get(g.id);
-              const conns = connectionCount(g.id);
-              return (
-                <li
-                  key={g.id}
-                  className={`combobox-option guest-search-option${i === highlight ? " is-active" : ""}${g.id === selectedGuestId ? " is-selected" : ""}`}
-                  onMouseDown={(e) => { e.preventDefault(); selectMatch(g.id); }}
-                  onMouseEnter={() => setHighlight(i)}
-                >
-                  <span
-                    className="guest-dot"
-                    style={{
-                      background:
-                        tableIdx === undefined ? "var(--text-2)" : tableColor(tableIdx),
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span style={{ flex: 1 }}>{g.name}</span>
-                  {conns > 0 && (
-                    <span className="guest-meta">{conns}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>,
-          document.body,
-        )}
 
       <div className="guest-list">
         {guests.length === 0 && (
@@ -243,7 +132,10 @@ export function GuestPanel() {
             </Button>
           </div>
         )}
-        {guests.map((g) => {
+        {guests.length > 0 && filteredGuests.length === 0 && (
+          <p className="empty-hint">No guests match “{name.trim()}”.</p>
+        )}
+        {filteredGuests.map((g) => {
           const tableIdx = tableOfGuest.get(g.id);
           const isSelected = g.id === selectedGuestId;
           return (

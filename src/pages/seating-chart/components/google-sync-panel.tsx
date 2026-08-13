@@ -308,6 +308,9 @@ export function GoogleSyncPanel() {
             A sheet already holding a seating chart is imported. A sheet with
             other data is left untouched — it won’t be overwritten.
           </p>
+          {google.status === "error" && (
+            <p className="sync-error">{google.error}</p>
+          )}
         </>
       )}
 
