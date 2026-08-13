@@ -10,7 +10,10 @@ import type {
   SeatingTable,
 } from "../types";
 import { solveSeating } from "../pages/seating-chart/helpers/seating";
-import { valueForLabel } from "../components/form/config/relationship-tiers";
+import {
+  valueForLabel,
+  DEFAULT_TIER,
+} from "../components/form/config/relationship-tiers";
 
 /** Stable, order-independent key for an undirected guest pair. */
 export function pairKey(a: string, b: string): string {
@@ -80,6 +83,14 @@ interface AppState {
 
   setConnection: (source: string, target: string, label: string) => void;
   removeConnection: (source: string, target: string) => void;
+  /** Toggle the "must sit together" pin, independent of whatever relationship is set. */
+  setConnectionPinned: (source: string, target: string, pinned: boolean) => void;
+  /** Set/clear the "predicted match" boost strength, independent of the relationship. */
+  setConnectionMatchBoost: (
+    source: string,
+    target: string,
+    matchBoost: number | undefined,
+  ) => void;
   /**
    * Connect every pair among `ids` with `label` (a clique). Existing pairs are
    * left untouched unless `overwrite` is true. Returns how many were added/changed.
@@ -209,11 +220,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     const value = valueForLabel(label);
     set((s) => {
       const key = pairKey(source, target);
+      const existing = s.connections.find(
+        (c) => pairKey(c.source, c.target) === key,
+      );
       const rest = s.connections.filter(
         (c) => pairKey(c.source, c.target) !== key,
       );
       return {
-        connections: [...rest, { source, target, value, label }],
+        connections: [
+          ...rest,
+          {
+            source,
+            target,
+            value,
+            label,
+            pinned: existing?.pinned,
+            matchBoost: existing?.matchBoost,
+          },
+        ],
         result: null,
       };
     });
@@ -230,6 +254,52 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  setConnectionPinned: (source, target, pinned) => {
+    if (source === target) return;
+    set((s) => {
+      const key = pairKey(source, target);
+      const existing = s.connections.find(
+        (c) => pairKey(c.source, c.target) === key,
+      );
+      const rest = s.connections.filter(
+        (c) => pairKey(c.source, c.target) !== key,
+      );
+      const base = existing ?? {
+        source,
+        target,
+        value: DEFAULT_TIER.value,
+        label: DEFAULT_TIER.label,
+      };
+      return {
+        connections: [...rest, { ...base, pinned }],
+        result: null,
+      };
+    });
+  },
+
+  setConnectionMatchBoost: (source, target, matchBoost) => {
+    if (source === target) return;
+    set((s) => {
+      const key = pairKey(source, target);
+      const existing = s.connections.find(
+        (c) => pairKey(c.source, c.target) === key,
+      );
+      const rest = s.connections.filter(
+        (c) => pairKey(c.source, c.target) !== key,
+      );
+      const base = existing ?? {
+        source,
+        target,
+        value: DEFAULT_TIER.value,
+        label: DEFAULT_TIER.label,
+      };
+      return {
+        connections: [...rest, { ...base, matchBoost }],
+        result: null,
+      };
+    });
+  },
+
   addGroupConnections: (ids, label, overwrite) => {
     if (ids.length < 2) return 0;
     const value = valueForLabel(label);
@@ -243,8 +313,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         const b = ids[j];
         if (a === b) continue;
         const key = pairKey(a, b);
-        if (byPair.has(key) && !overwrite) continue;
-        byPair.set(key, { source: a, target: b, value, label });
+        const existing = byPair.get(key);
+        if (existing && !overwrite) continue;
+        byPair.set(key, {
+          source: a,
+          target: b,
+          value,
+          label,
+          pinned: existing?.pinned,
+          matchBoost: existing?.matchBoost,
+        });
         changed++;
       }
     }

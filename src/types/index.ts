@@ -27,6 +27,10 @@ export interface Connection {
   target: string; // Guest id
   value: number;
   label: string;
+  /** Forces the pair to share a table, on top of whatever `label` relationship is set — no effect on happiness/fomo scoring. */
+  pinned?: boolean;
+  /** Extra affinity pull (a tier value, lower = stronger) stacked on top of the relationship — counts toward happiness but can never trigger the fomo penalty. */
+  matchBoost?: number;
 }
 
 /** Tunable d3-force parameters for the relationship graph layout. */

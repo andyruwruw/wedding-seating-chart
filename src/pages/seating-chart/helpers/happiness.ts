@@ -123,6 +123,8 @@ export function feltScore(
 interface GuestSocial {
   /** Friend weight summed per table index. */
   w: number[];
+  /** Subset of `w` eligible to count as a "missed gathering" (fomo). */
+  wFomo: number[];
   /** Conflict-partner count per table index. */
   conf: number[];
   /** Total friend weight (sum of w). */
@@ -149,7 +151,7 @@ export function computeHappiness(
   const ensure = (id: string): GuestSocial => {
     let s = social.get(id);
     if (!s) {
-      s = { w: new Array(t).fill(0), conf: new Array(t).fill(0), total: 0 };
+      s = { w: new Array(t).fill(0), wFomo: new Array(t).fill(0), conf: new Array(t).fill(0), total: 0 };
       social.set(id, s);
     }
     return s;
@@ -167,9 +169,20 @@ export function computeHappiness(
       const es = ensure(c.source);
       es.w[tb] += aff;
       es.total += aff;
+      es.wFomo[tb] += aff;
       const et = ensure(c.target);
       et.w[ta] += aff;
       et.total += aff;
+      et.wFomo[ta] += aff;
+      // Predicted-match boost: counts toward happiness (`w`/`total`) but
+      // never toward the fomo/left-out term (`wFomo` skips it).
+      if (c.matchBoost) {
+        const boost = affinityForValue(c.matchBoost, taper);
+        es.w[tb] += boost;
+        es.total += boost;
+        et.w[ta] += boost;
+        et.total += boost;
+      }
     }
   }
 
@@ -184,7 +197,7 @@ export function computeHappiness(
       const withMe = s.w[tp];
       let leftOut = 0;
       for (let i = 0; i < t; i++) {
-        if (i !== tp && s.w[i] > leftOut) leftOut = s.w[i];
+        if (i !== tp && s.wFomo[i] > leftOut) leftOut = s.wFomo[i];
       }
       const base = feltScore(withMe, leftOut, s.total, globalFomo);
       const shortfall = personalShortfall(base, multOf(id));

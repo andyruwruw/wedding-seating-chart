@@ -111,7 +111,7 @@ function buildUnits(ids: string[], connections: Connection[]): string[][] {
   };
   for (const c of connections) {
     if (
-      KEEP_TOGETHER_LABELS.has(c.label) &&
+      (KEEP_TOGETHER_LABELS.has(c.label) || c.pinned) &&
       parent.has(c.source) &&
       parent.has(c.target)
     ) {
@@ -167,11 +167,16 @@ function solveCore(
   const tableCount = capacities.length;
 
   // --- Per-guest social graph (positive friends + conflict partners).
+  // `friends` drives withMe/total (everything that can make someone happy).
+  // `friendsFomo` is the subset eligible to count as a "missed gathering" —
+  // structural pins never join it, fomo-exempt ties never join it either.
   const friends = new Map<string, Array<[string, number]>>();
+  const friendsFomo = new Map<string, Array<[string, number]>>();
   const conflictPartners = new Map<string, string[]>();
   const totalW = new Map<string, number>();
   for (const id of ids) {
     friends.set(id, []);
+    friendsFomo.set(id, []);
     conflictPartners.set(id, []);
     totalW.set(id, 0);
   }
@@ -186,6 +191,17 @@ function solveCore(
       friends.get(c.target)!.push([c.source, a]);
       totalW.set(c.source, totalW.get(c.source)! + a);
       totalW.set(c.target, totalW.get(c.target)! + a);
+      friendsFomo.get(c.source)!.push([c.target, a]);
+      friendsFomo.get(c.target)!.push([c.source, a]);
+      // Predicted-match boost: extra pull, counts toward happiness, but
+      // never toward the fomo/left-out term (only `friends` gets it).
+      if (c.matchBoost) {
+        const boost = affinityForValue(c.matchBoost, taper);
+        friends.get(c.source)!.push([c.target, boost]);
+        friends.get(c.target)!.push([c.source, boost]);
+        totalW.set(c.source, totalW.get(c.source)! + boost);
+        totalW.set(c.target, totalW.get(c.target)! + boost);
+      }
     }
   }
 
@@ -304,13 +320,17 @@ function solveCore(
   tableMembers.forEach((members, tbl) =>
     members.forEach((id) => tableOf.set(id, tbl)),
   );
-  // friend weight + conflict count per table, per guest.
+  // friend weight (all + fomo-eligible only) + conflict count per table, per guest.
   const fwt = new Map<string, number[]>();
+  const fwtFomo = new Map<string, number[]>();
   const cwt = new Map<string, number[]>();
   for (const id of ids) {
     const w = new Array(tableCount).fill(0);
     for (const [f, a] of friends.get(id)!) w[tableOf.get(f)!] += a;
     fwt.set(id, w);
+    const wf = new Array(tableCount).fill(0);
+    for (const [f, a] of friendsFomo.get(id)!) wf[tableOf.get(f)!] += a;
+    fwtFomo.set(id, wf);
     const cf = new Array(tableCount).fill(0);
     for (const c of conflictPartners.get(id)!) cf[tableOf.get(c)!] += 1;
     cwt.set(id, cf);
@@ -336,9 +356,10 @@ function solveCore(
     if (tw > 0) {
       const w = fwt.get(id)!;
       const withMe = w[tp];
+      const wf = fwtFomo.get(id)!;
       let leftOut = 0;
       for (let i = 0; i < tableCount; i++) {
-        if (i !== tp && w[i] > leftOut) leftOut = w[i];
+        if (i !== tp && wf[i] > leftOut) leftOut = wf[i];
       }
       const felt = feltScore(withMe, leftOut, tw, globalFomo);
       const shortfall = personalShortfall(felt, multOf(id));
@@ -363,6 +384,11 @@ function solveCore(
         const w = fwt.get(f)!;
         w[from] -= a2;
         w[to] += a2;
+      }
+      for (const [f, a2] of friendsFomo.get(m)!) {
+        const wf = fwtFomo.get(f)!;
+        wf[from] -= a2;
+        wf[to] += a2;
       }
       for (const c of conflictPartners.get(m)!) {
         const cf = cwt.get(c)!;

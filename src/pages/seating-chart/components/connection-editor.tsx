@@ -5,8 +5,10 @@ import { Select } from "../../../components/form/select";
 import { Combobox } from "../../../components/form/combobox";
 import { useAppStore } from "../../../store/use-app-store";
 import {
+  DEFAULT_MATCH_BOOST,
   KEEP_APART_VALUE,
   labelForValue,
+  MATCH_BOOST_LEVELS,
   RELATIONSHIP_TIERS,
   tierIndexForLabel,
 } from "../../../components/form/config/relationship-tiers";
@@ -38,11 +40,15 @@ export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
   const selectedGuestId = useAppStore((s) => s.selectedGuestId);
   const setConnection = useAppStore((s) => s.setConnection);
   const removeConnection = useAppStore((s) => s.removeConnection);
+  const setConnectionPinned = useAppStore((s) => s.setConnectionPinned);
+  const setConnectionMatchBoost = useAppStore((s) => s.setConnectionMatchBoost);
   const setGraphColorMode = useAppStore((s) => s.setGraphColorMode);
 
   const [activeTab, setActiveTab] = useState<ConnTab>("connected");
   const [targetId, setTargetId] = useState("");
   const [tierIndex, setTierIndex] = useState(DEFAULT_TIER_INDEX);
+  const [addPinned, setAddPinned] = useState(false);
+  const [addMatchBoost, setAddMatchBoost] = useState<number | undefined>(undefined);
   const [alignmentOpen, setAlignmentOpen] = useState(false);
   const addComboRef = useRef<HTMLDivElement>(null);
 
@@ -120,6 +126,8 @@ export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
           otherId: c.source === selected.id ? c.target : c.source,
           value: c.value,
           label: c.label ?? labelForValue(c.value),
+          pinned: c.pinned ?? false,
+          matchBoost: c.matchBoost,
         }))
         .sort((a, b) => a.value - b.value)
     : [];
@@ -127,6 +135,10 @@ export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
   const addConnection = () => {
     if (!selected || !targetId) return;
     setConnection(selected.id, targetId, RELATIONSHIP_TIERS[tierIndex].label);
+    if (addPinned) setConnectionPinned(selected.id, targetId, true);
+    if (addMatchBoost) setConnectionMatchBoost(selected.id, targetId, addMatchBoost);
+    setAddPinned(false);
+    setAddMatchBoost(undefined);
   };
 
   const pickSuggestion = (id: string) => {
@@ -215,7 +227,7 @@ export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
               {myConnections.length === 0 && (
                 <p className="empty-hint">No connections yet — add one below.</p>
               )}
-              {myConnections.map(({ otherId, value, label }) => (
+              {myConnections.map(({ otherId, value, label, pinned, matchBoost }) => (
                 <div key={otherId} className="connection-row">
                   <div className="connection-row-head">
                     <span className="connection-row-name">{nameOf(otherId)}</span>
@@ -240,6 +252,43 @@ export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
                     options={TIER_OPTIONS}
                     className={`tier-select ${value === KEEP_APART_VALUE ? "tier-select-danger" : ""}`}
                   />
+                  <div className="connection-row-extra">
+                    <button
+                      type="button"
+                      className={`mini-toggle${pinned ? " mini-toggle-on" : ""}`}
+                      onClick={() => setConnectionPinned(selected.id, otherId, !pinned)}
+                      title="Force them to share a table, regardless of the relationship above — no effect on happiness/fomo."
+                    >
+                      📌 Must sit together
+                    </button>
+                    <button
+                      type="button"
+                      className={`mini-toggle${matchBoost ? " mini-toggle-on" : ""}`}
+                      onClick={() =>
+                        setConnectionMatchBoost(
+                          selected.id,
+                          otherId,
+                          matchBoost ? undefined : DEFAULT_MATCH_BOOST,
+                        )
+                      }
+                      title="Extra pull on top of the relationship above — boosts happiness if satisfied, but can never trigger the fomo penalty if not."
+                    >
+                      ✨ Predicted match
+                    </button>
+                    {matchBoost !== undefined && (
+                      <Select
+                        value={matchBoost}
+                        onChange={(v) =>
+                          setConnectionMatchBoost(selected.id, otherId, Number(v))
+                        }
+                        options={MATCH_BOOST_LEVELS.map((l) => ({
+                          label: l.label,
+                          value: l.value,
+                        }))}
+                        className="mini-toggle-select"
+                      />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -262,6 +311,37 @@ export function ConnectionEditor({ onBack }: ConnectionEditorProps) {
                     onChange={(v) => setTierIndex(Number(v))}
                     options={TIER_OPTIONS}
                   />
+                  <div className="connection-row-extra">
+                    <button
+                      type="button"
+                      className={`mini-toggle${addPinned ? " mini-toggle-on" : ""}`}
+                      onClick={() => setAddPinned((v) => !v)}
+                      title="Force them to share a table, regardless of the relationship above — no effect on happiness/fomo."
+                    >
+                      📌 Must sit together
+                    </button>
+                    <button
+                      type="button"
+                      className={`mini-toggle${addMatchBoost ? " mini-toggle-on" : ""}`}
+                      onClick={() =>
+                        setAddMatchBoost((v) => (v ? undefined : DEFAULT_MATCH_BOOST))
+                      }
+                      title="Extra pull on top of the relationship above — boosts happiness if satisfied, but can never trigger the fomo penalty if not."
+                    >
+                      ✨ Predicted match
+                    </button>
+                    {addMatchBoost !== undefined && (
+                      <Select
+                        value={addMatchBoost}
+                        onChange={(v) => setAddMatchBoost(Number(v))}
+                        options={MATCH_BOOST_LEVELS.map((l) => ({
+                          label: l.label,
+                          value: l.value,
+                        }))}
+                        className="mini-toggle-select"
+                      />
+                    )}
+                  </div>
                   <Button variant="primary" block onClick={addConnection} disabled={!targetId}>
                     Add
                   </Button>

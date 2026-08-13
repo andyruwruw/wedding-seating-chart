@@ -56,6 +56,19 @@ export const DEFAULT_TIER =
   RELATIONSHIP_TIERS.find((t) => t.label === "Acquaintance") ?? RELATIONSHIP_TIERS[0];
 
 /**
+ * Strength options for a connection's "Predicted match" boost — an add-on
+ * pull independent of the relationship tier, using the same value scale
+ * (lower = stronger). Only three rungs: this is a nudge, not a full tier.
+ */
+export const MATCH_BOOST_LEVELS: { label: string; value: number }[] = [
+  { label: "Mild", value: 4 },
+  { label: "Strong", value: 2.5 },
+  { label: "Very strong", value: 1 },
+];
+
+export const DEFAULT_MATCH_BOOST = MATCH_BOOST_LEVELS[1].value;
+
+/**
  * Affinity = how strongly a co-seated pair wants to be together.
  *
  * Geometric taper: each step closer is `taper`× the previous one, so the
