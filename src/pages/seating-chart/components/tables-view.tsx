@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../../store/use-app-store";
 import { linkStyle } from "../../../components/graph/helpers";
 import { tableColor } from "../config";
@@ -49,6 +49,8 @@ function TableCircle({
   guestDetails,
   locked,
   onToggleLock,
+  swapSelectedId,
+  onSeatClick,
 }: {
   index: number;
   guestIds: string[];
@@ -59,6 +61,8 @@ function TableCircle({
   guestDetails: Map<string, GuestDetail>;
   locked?: boolean;
   onToggleLock?: () => void;
+  swapSelectedId: string | null;
+  onSeatClick: (guestId: string) => void;
 }) {
   const color = tableColor(index);
   const toneColor = HAPPINESS_COLORS[happiness.tone];
@@ -170,20 +174,32 @@ function TableCircle({
                 ? lx - LABEL_PAD
                 : 2 * Math.min(lx, SIZE - lx) - LABEL_PAD;
           const label = fitLabel(s.name, maxWidth);
+          const selected = s.id === swapSelectedId;
           return (
             <g
               key={s.id}
-              style={{ cursor: "default" }}
+              className={`seat-group${selected ? " seat-group-selected" : ""}`}
+              style={{ cursor: "pointer" }}
               onMouseEnter={(e) => showTooltip(s.id, e)}
               onMouseLeave={hideTooltip}
+              onClick={() => onSeatClick(s.id)}
             >
+              {selected && (
+                <circle
+                  cx={s.x} cy={s.y} r={9}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={1.5}
+                  className="seat-select-ring"
+                />
+              )}
               <circle
                 cx={s.x} cy={s.y} r={5}
                 fill={s.color}
                 style={{ stroke: "var(--bg-0)" }}
                 strokeWidth={1.5}
               />
-              {/* Invisible larger hit area so the hover is easy to trigger */}
+              {/* Invisible larger hit area so the hover/click is easy to trigger */}
               <circle cx={s.x} cy={s.y} r={12} fill="transparent" />
               <text
                 x={lx} y={ly}
@@ -218,11 +234,34 @@ export function TablesView() {
   const fomo = useAppStore((s) => s.config.fomo);
   const worstCase = useAppStore((s) => s.config.worstCaseScore);
   const toggleTableLock = useAppStore((s) => s.toggleTableLock);
+  const swapGuests = useAppStore((s) => s.swapGuests);
+
+  const [swapSelectedId, setSwapSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!swapSelectedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSwapSelectedId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [swapSelectedId]);
 
   const nameOf = useMemo(() => {
     const map = new Map(guests.map((g) => [g.id, g.name] as const));
     return (id: string) => map.get(id) ?? "?";
   }, [guests]);
+
+  const handleSeatClick = (id: string) => {
+    if (swapSelectedId === null) {
+      setSwapSelectedId(id);
+    } else if (swapSelectedId === id) {
+      setSwapSelectedId(null); // clicking the same seat again undoes the selection
+    } else {
+      swapGuests(swapSelectedId, id);
+      setSwapSelectedId(null);
+    }
+  };
 
   const report = useMemo(
     () =>
@@ -250,19 +289,35 @@ export function TablesView() {
       <div className="tables-scroll">
         <div className="tables-content">
           <div className="tables-legend">
-            <span className="section-label">Hover a name to see why</span>
-            <span className="tl-key">
-              <i className="tl-dot" style={{ background: HAPPINESS_COLORS.great }} />
-              happy
+            <span className="section-label">
+              {swapSelectedId
+                ? `Swapping ${nameOf(swapSelectedId)} — click another guest to swap, or click them again to cancel`
+                : "Hover a name to see why, click to swap seats"}
             </span>
-            <span className="tl-key">
-              <i className="tl-dot" style={{ background: HAPPINESS_COLORS.ok }} />
-              mixed
-            </span>
-            <span className="tl-key">
-              <i className="tl-dot" style={{ background: HAPPINESS_COLORS.bad }} />
-              unhappy
-            </span>
+            {swapSelectedId ? (
+              <button
+                type="button"
+                className="swap-cancel-btn"
+                onClick={() => setSwapSelectedId(null)}
+              >
+                Cancel swap
+              </button>
+            ) : (
+              <>
+                <span className="tl-key">
+                  <i className="tl-dot" style={{ background: HAPPINESS_COLORS.great }} />
+                  happy
+                </span>
+                <span className="tl-key">
+                  <i className="tl-dot" style={{ background: HAPPINESS_COLORS.ok }} />
+                  mixed
+                </span>
+                <span className="tl-key">
+                  <i className="tl-dot" style={{ background: HAPPINESS_COLORS.bad }} />
+                  unhappy
+                </span>
+              </>
+            )}
           </div>
 
           <div className="tables-grid">
@@ -278,6 +333,8 @@ export function TablesView() {
                 guestDetails={guestDetails ?? new Map()}
                 locked={t.locked}
                 onToggleLock={() => toggleTableLock(t.id)}
+                swapSelectedId={swapSelectedId}
+                onSeatClick={handleSeatClick}
               />
             ))}
           </div>

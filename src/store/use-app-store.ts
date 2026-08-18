@@ -115,6 +115,8 @@ interface AppState {
   regenerate: () => void;
   /** Toggle whether the table currently holding this id stays fixed forever. */
   toggleTableLock: (tableId: string) => void;
+  /** Manually swap two guests' tables in the current result — bypasses every solver rule (pins, keep-apart, etc). */
+  swapGuests: (a: string, b: string) => void;
 
   loadSnapshot: (snapshot: ProjectSnapshot, merge?: boolean) => void;
   clearAll: () => void;
@@ -348,6 +350,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   generate: () => runSolve(set, get),
 
   regenerate: () => runSolve(set, get),
+
+  swapGuests: (a, b) =>
+    set((s) => {
+      if (!s.result || a === b) return {};
+      const swap = (ids: string[]) =>
+        ids.map((id) => (id === a ? b : id === b ? a : id));
+      const tables = s.result.tables.map((t) => ({ ...t, guestIds: swap(t.guestIds) }));
+      const lockedTables = s.lockedTables.map((lt) => ({ ...lt, guestIds: swap(lt.guestIds) }));
+      return { result: { ...s.result, tables }, lockedTables };
+    }),
 
   toggleTableLock: (tableId) =>
     set((s) => {
