@@ -1172,6 +1172,19 @@
   50% { opacity: 1; }
 }
 
+.seat-group-empty {
+  opacity: 0.55;
+}
+.seat-group-empty:hover {
+  opacity: 1;
+}
+.seat-group-drop circle:first-of-type {
+  animation: seat-select-pulse 1.1s ease-in-out infinite;
+}
+.seat-name-empty {
+  font-style: italic;
+}
+
 .tables-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

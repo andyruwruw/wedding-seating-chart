@@ -117,6 +117,8 @@ interface AppState {
   toggleTableLock: (tableId: string) => void;
   /** Manually swap two guests' tables in the current result — bypasses every solver rule (pins, keep-apart, etc). */
   swapGuests: (a: string, b: string) => void;
+  /** Manually move a guest into an empty seat at the given table — bypasses every solver rule. */
+  moveGuestToTable: (guestId: string, tableId: string) => void;
 
   loadSnapshot: (snapshot: ProjectSnapshot, merge?: boolean) => void;
   clearAll: () => void;
@@ -358,6 +360,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         ids.map((id) => (id === a ? b : id === b ? a : id));
       const tables = s.result.tables.map((t) => ({ ...t, guestIds: swap(t.guestIds) }));
       const lockedTables = s.lockedTables.map((lt) => ({ ...lt, guestIds: swap(lt.guestIds) }));
+      return { result: { ...s.result, tables }, lockedTables };
+    }),
+
+  moveGuestToTable: (guestId, tableId) =>
+    set((s) => {
+      if (!s.result) return {};
+      const removeFrom = (ids: string[]) => ids.filter((id) => id !== guestId);
+      const place = (t: { id: string; guestIds: string[] }) => {
+        if (t.id !== tableId) return { ...t, guestIds: removeFrom(t.guestIds) };
+        if (t.guestIds.includes(guestId)) return t;
+        return { ...t, guestIds: [...removeFrom(t.guestIds), guestId] };
+      };
+      const tables = s.result.tables.map(place);
+      const lockedTables = s.lockedTables.map(place);
       return { result: { ...s.result, tables }, lockedTables };
     }),
 
